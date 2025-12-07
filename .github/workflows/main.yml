@@ -1,0 +1,62 @@
+name: group_6_assignment_2
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches: ["main"]
+    types: [opened, synchronize, reopened]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        ros_distro: [jazzy]  # Updated to ROS 2 Jazzy
+        ubuntu_version: [24.04]  # Targeting Ubuntu 24.04
+    runs-on: ubuntu-${{ matrix.ubuntu_version }}
+
+    steps:
+      - name: Install ROS 2 Jazzy packages
+        run: |
+          sudo apt update
+          sudo apt install -y software-properties-common
+          sudo add-apt-repository universe
+          sudo apt update && sudo apt install -y curl
+          sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
+          sudo apt update
+          sudo apt install -y ros-jazzy-ros-base python3-colcon-common-extensions
+          sudo apt install -y lcov
+
+          # Install additional packages
+          sudo apt-get -y install ros-jazzy-ament-cmake \
+          ros-jazzy-ur ros-jazzy-ur-simulation-gz ros-jazzy-navigation2 ros-jazzy-nav2-bringup   \
+          ros-jazzy-nav2-minimal-tb* ros-jazzy-turtlebot3-gazebo ros-jazzy-rviz-visual-tools \
+          ros-jazzy-gz-ros2-control ros-jazzy-ros-gz-sim ros-jazzy-joint-state-broadcaster \
+          ros-jazzy-joint-trajectory-controller ros-jazzy-pcl-ros ros-jazzy-realsense2-description  \
+          ros-jazzy-robotiq-controllers ros-jazzy-robotiq-description ros-jazzy-ros-gz \
+          ros-jazzy-apriltag ros-jazzy-apriltag-ros ros-jazzy-apriltag-detector \
+          ros-jazzy-image-proc ros-jazzy-depth-image-proc ros-jazzy-nav2-route 
+
+      - name: Setup Workspace
+        run: |
+          source /opt/ros/jazzy/setup.bash  # Changed to Jazzy
+          mkdir -p ros_ws/src/group_6_assignment_2
+          cd ros_ws
+          colcon build
+          source install/setup.bash
+
+      - uses: actions/checkout@v3
+        with:
+          path: ros_ws/src/group_6_assignment_2
+
+      - name: Configure CMake flags and build executables
+        run: |
+          source /opt/ros/jazzy/setup.bash  # Changed to Jazzy
+          sudo apt install python3-rosdep
+          sudo rosdep init
+          rosdep update --include-eol-distros
+          cd ros_ws
+          rosdep install --from-paths src -y --ignore-src
+          colcon build --packages-select group_6_assignment_2
