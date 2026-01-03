@@ -1,0 +1,23 @@
+/**:
+    ros__parameters:
+        image_transport: raw    # image format
+        family: 36h11           # tag family name
+        size: 0.05              # USER CHANGED BASED ON SPEC "THE APRILTAG SIZE IS: 0.050x0.050 [m]" tag edge size in meter
+        max_hamming: 0          # maximum allowed hamming distance (corrected bits)
+
+        # see "apriltag.h" 'struct apriltag_detector' for more documentation on these optional parameters
+        detector:
+            threads: 4          # number of threads
+            decimate: 2.0       # decimate resolution for quad detection
+            blur: 0.0           # sigma of Gaussian blur for quad detection
+            refine: True        # snap to strong gradients
+            sharpening: 0.25    # sharpening of decoded images
+            debug: False        # write additional debugging images to current working directory
+            publish_tf: True 
+
+
+        pose_estimation_method: "pnp"   # method for estimating the tag pose
+        tag:
+            ids: [1,10]            # Use the IDs present in your environment
+            frames: ["tag36h11:1", "tag36h11:10"]
+            sizes: [0.05, 0.05]   # Ensure sizes match the actual tag sizes in meters

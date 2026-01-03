@@ -13,6 +13,9 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(moveit_ros_planning_interface REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -25,5 +28,35 @@ if(BUILD_TESTING)
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "srv/GetCubePoses.srv"
+  DEPENDENCIES geometry_msgs
+)
+
+add_executable(cube_detector src/CubeDetector.cpp)
+ament_target_dependencies(
+  cube_detector
+  rclcpp
+  geometry_msgs
+  tf2
+  tf2_ros
+)
+
+rosidl_get_typesupport_target(cpp_typesupport_target 
+  ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+target_link_libraries(cube_detector 
+  ${cpp_typesupport_target}
+)
+
+install(TARGETS 
+  cube_detector
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(DIRECTORY launch config
+  DESTINATION share/${PROJECT_NAME}
+)
 
 ament_package()
