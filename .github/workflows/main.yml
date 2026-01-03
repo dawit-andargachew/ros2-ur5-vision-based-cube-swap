@@ -14,27 +14,29 @@ jobs:
         ros_distro: [jazzy]
 
     steps:
-      # Setup ROS 2 Jazzy environment
+      # 1. Checkout your code first
+      - uses: actions/checkout@v4
+        with:
+          path: ros_ws/src/group_6_assignment_2
+
+      # 2. Setup ROS 2 Jazzy environment 
       - uses: ros-tooling/setup-ros@v0.7
         with:
           required-ros-distributions: ${{ matrix.ros_distro }}
 
-      # Checkout your code into the correct workspace structure
-      - uses: actions/checkout@v4
-        with:
-          # This creates ros_ws/src/group_6_assignment_2 and puts your repo there
-          path: ros_ws/src/group_6_assignment_2
-
-      # Install dependencies (reads the package.xml you edited)
+      # 3. Install dependencies
       - name: Install dependencies
         run: |
           cd ros_ws
+          # Ensure rosdep is initialized (setup-ros usually does this, but this is a safe backup)
+          sudo rosdep init || true
           rosdep update
-          # This looks into 'src', finds your package.xml, and installs the list we made
           rosdep install --from-paths src --ignore-src -y --rosdistro ${{ matrix.ros_distro }}
 
-      # Build
+      # 4. Build with explicit sourcing
       - name: Build
         run: |
+          # This is the fix: manually source the ROS setup before running colcon
+          source /opt/ros/${{ matrix.ros_distro }}/setup.bash
           cd ros_ws
-          colcon build --symlink-install
+          colcon build --event-handlers console_direct+ --symlink-install
