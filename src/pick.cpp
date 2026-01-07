@@ -37,9 +37,8 @@ int main(int argc, char * argv[]) {
     // --- UPDATED HARDCODED CUBE LOCATION (From Service) ---
     cube_pose.position.x = 3.97; 
     cube_pose.position.y = -1.10;
-    // Updated Z to 0.45 (approx resting height after falling to table). 
-    // 0.81 was spawn height but unreachable.
-    cube_pose.position.z = 0.45; 
+    // Updated Z to 0.36 to match real cube on table
+    cube_pose.position.z = 0.4; 
     cube_pose.orientation.w = 1.0;
     
     RCLCPP_INFO(node->get_logger(), "Adding collision object at: [%.2f, %.2f, %.2f]", 
@@ -71,27 +70,37 @@ int main(int argc, char * argv[]) {
     }
 
     // 3. Move to PRE-GRASP Position (Side Approach)
-    // The cube is at Y = -1.1. The robot is at Y = -0.5.
-    // Approaching from the side (Y-axis) is much closer than reaching down from top.
+    // Cube Y = -1.1. Robot Y = -0.5.
+    // Gripper length ~0.16m.
+    // We want the Wrist (tool0) to be at Y = CubeY + 0.13 (Deep grasp, fingers surround cube).
     
-    geometry_msgs::msg::Pose target_pose = cube_pose;
-    // Align wrist height with cube center
-    target_pose.position.z = cube_pose.position.z; 
-    // Move wrist back (in +Y direction) to account for gripper length + approach distance
-    // Gripper ~0.16m. Pre-grasp offset 0.10m. Total 0.26m.
-    target_pose.position.y = cube_pose.position.y + 0.26; 
+    geometry_msgs::msg::Pose grasp_pose = cube_pose;
+    // Z=0.38 (Center of cube is 0.38 if table is 0.33 + 0.05).
+    // This is safe and reachable.
+    grasp_pose.position.z = 0.38; 
     
-    // Orientation: Point gripper towards -Y (Rotation around X by 90 degrees)
-    // Quaternion for 90 deg rotation around X-axis: 0.707, 0, 0, 0.707
-    target_pose.orientation.x = 0.7071068; 
-    target_pose.orientation.y = 0.0;
-    target_pose.orientation.z = 0.0;
-    target_pose.orientation.w = 0.7071068;
+    // Y = CubeY + 0.18. Gripper is ~0.16. Fingers will be at edge of cube.
+    // This reduces the "reach" depth required.
+    grasp_pose.position.y = cube_pose.position.y + 0.18; 
+    
+    // Orientation: Point -Y.
+    // TF: Base(X+,Y+,Z+). We want ToolZ to be -Y.
+    // Rotate -90 around X. (X -> X, Y -> -Z, Z -> Y) -> Wrong.
+    // Rotate +90 around X. (X -> X, Y -> Z, Z -> -Y). CORRECT.
+    // Quaternion for +90 deg X: x=0.707, w=0.707.
+    grasp_pose.orientation.x = 0.7071068; 
+    grasp_pose.orientation.y = 0.0;
+    grasp_pose.orientation.z = 0.0;
+    grasp_pose.orientation.w = 0.7071068;
+
+    // Pre-grasp is 15cm back from grasp
+    geometry_msgs::msg::Pose pre_grasp_pose = grasp_pose;
+    pre_grasp_pose.position.y += 0.15;
 
     RCLCPP_INFO(node->get_logger(), "Moving to Pre-Grasp: [%.2f, %.2f, %.2f]", 
-        target_pose.position.x, target_pose.position.y, target_pose.position.z);
+        pre_grasp_pose.position.x, pre_grasp_pose.position.y, pre_grasp_pose.position.z);
 
-    arm_group.setPoseTarget(target_pose);
+    arm_group.setPoseTarget(pre_grasp_pose);
     if (arm_group.move() != moveit::core::MoveItErrorCode::SUCCESS) {
         RCLCPP_ERROR(node->get_logger(), "Failed to move to pre-grasp!");
         return 1;
@@ -101,12 +110,9 @@ int main(int argc, char * argv[]) {
     gripper_group.setNamedTarget("open"); 
     gripper_group.move();
 
-    // 5. Move to GRASP Position (Linear Approach along Y)
+    // 5. Move to GRASP Position (Linear Approach)
     std::vector<geometry_msgs::msg::Pose> waypoints;
-    geometry_msgs::msg::Pose grasp_pose = target_pose;
-    // Move forward in -Y direction by 10cm (leaving ~16cm for gripper length)
-    grasp_pose.position.y -= 0.10; 
-    waypoints.push_back(grasp_pose);
+    waypoints.push_back(grasp_pose); // Move to defined deep grasp pose
 
     moveit_msgs::msg::RobotTrajectory trajectory;
     const double eef_step = 0.01;
@@ -120,17 +126,31 @@ int main(int argc, char * argv[]) {
     arm_group.execute(trajectory);
 
     // 6. Close Gripper (Pick)
-    gripper_group.setNamedTarget("close"); 
-    gripper_group.move();
+    // Cube width is 6cm. Fully open is 8.5cm (0.0). Fully closed is 0cm (0.8).
+    // Target ~6cm is ~0.25 rad. We command 0.7 to ensure MAX force/squeeze.
+    // gripper_group.setNamedTarget("close"); 
+    std::vector<double> gripper_joint_values;
+    gripper_joint_values.push_back(0.7); // Tighten grasp
+    gripper_group.setJointValueTarget(gripper_joint_values);
+    
+    // Allow collision between gripper and cube during grasp
+    // (MoveIt often handles this automatically during 'pick', but manual move needs care)
+    // For now, we rely on the controller handling the stall.
+    
+    if (gripper_group.move() != moveit::core::MoveItErrorCode::SUCCESS) {
+        RCLCPP_WARN(node->get_logger(), "Gripper close reported failure (likely hit object), proceeding to attach...");
+    }
+    
+    // Give time for the grasp to settle physically
+    std::this_thread::sleep_for(std::chrono::seconds(2));
 
     // 7. Attach Object
     arm_group.attachObject(cube.id);
 
-    // 8. Lift Up (Retreat back +Y and Up +Z)
+    // 8. Lift Up (Purely Vertical first)
     waypoints.clear();
     geometry_msgs::msg::Pose lift_pose = grasp_pose;
-    lift_pose.position.y += 0.10; // Back out
-    lift_pose.position.z += 0.20; // Lift up
+    lift_pose.position.z += 0.20; // Lift straight up 20cm
     waypoints.push_back(lift_pose);
 
     fraction = arm_group.computeCartesianPath(waypoints, eef_step, trajectory);
