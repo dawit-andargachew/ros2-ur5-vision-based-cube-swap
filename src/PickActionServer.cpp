@@ -19,47 +19,105 @@
 
 #include "group_6_assignment_2/motion_util.hpp"
 
+#include "rclcpp_action/rclcpp_action.hpp"
+#include "group_6_assignment_2/action/pick.hpp"
+
 using namespace std::chrono_literals;
 using namespace motion_util;
 
-class PickNode : public rclcpp::Node
+namespace pick_action_cpp
+{
+class PickActionServer : public rclcpp::Node
 {
 public:
-  explicit PickNode(const rclcpp::NodeOptions& options)
-  : rclcpp::Node("pick_monitored", options),
+  using Pick = group_6_assignment_2::action::Pick;
+  using GoalHandlePick = rclcpp_action::ServerGoalHandle<Pick>;
+  
+  explicit PickActionServer(const rclcpp::NodeOptions& options = rclcpp::NodeOptions())
+  : rclcpp::Node("pick_action_server", options),
     arm_group_(std::shared_ptr<rclcpp::Node>(this, [](rclcpp::Node*) {}), kArmGroupName),
     gripper_group_(std::shared_ptr<rclcpp::Node>(this, [](rclcpp::Node*) {}), kGripperGroupName)
-  {
+  { 
+    // Create action server
+    this-> action_server_ = rclcpp_action::create_server<Pick>(
+      this,
+      "pick",
+      std::bind(&PickActionServer::handle_goal, this, std::placeholders::_1, std::placeholders::_2),
+      std::bind(&PickActionServer::handle_cancel, this, std::placeholders::_1),
+      std::bind(&PickActionServer::handle_accepted, this, std::placeholders::_1));
+
     configure_moveit(arm_group_, gripper_group_);  // Updated: Use motion_util::configure_moveit
     //apply_path_constraints(arm_group_, get_logger());  // ADDED: Apply path constraints
   }
 
-  bool run_pick_sequence()
+  bool run_pick_sequence(uint8_t cube_id, const std::shared_ptr<GoalHandlePick> goal_handle)
   {
+
+    auto feedback = std::make_shared<Pick::Feedback>();
+    feedback->status = "Starting pick sequence";
+    goal_handle->publish_feedback(feedback);
+
+
     // Wait for robot state before starting
-    RCLCPP_INFO(get_logger(), "Waiting for robot state to be available...");
+    feedback->status = "Waiting for robot state";
+    goal_handle->publish_feedback(feedback);
     if (!wait_for_robot_state()) {
       RCLCPP_ERROR(get_logger(), "Failed to get robot state. Check if /joint_states is being published.");
       return false;
     }
     
+    //we check cancelling after each major step of the pipeline
+    if (goal_handle->is_canceling()) return false;
+
+    feedback->status = "Setting up planning scene";
+    goal_handle->publish_feedback(feedback);
     if (!setup_scene()) return false;
+    
+    if (goal_handle->is_canceling()) return false;
+   
     
     // Give time for planning scene to update
     rclcpp::sleep_for(2s);
-    
-    if (!move_to_pre_grasp()) return false;
-    if (!open_gripper()) return false;
-    if (!move_to_grasp_non_cartesian()) return false;
-    if (!close_gripper()) return false;
-    if (!attach_object()) return false;
-    if (!lift_up_non_cartesian()) return false;
 
+    feedback->status = "Moving to pre-grasp position";
+    goal_handle->publish_feedback(feedback);
+    if (!move_to_pre_grasp()) return false;
+    if (goal_handle->is_canceling()) return false;
+
+    feedback->status = "Executing grasp";
+    goal_handle->publish_feedback(feedback);
+    if (!open_gripper()) return false;
+    if (goal_handle->is_canceling()) return false;
+
+    feedback->status = "Moving to grasp position";
+    goal_handle->publish_feedback(feedback);
+    if (!move_to_grasp_non_cartesian()) return false;
+    if (goal_handle->is_canceling()) return false;
+
+    feedback->status = "Closing gripper and attaching object";
+    goal_handle->publish_feedback(feedback);
+    if (!close_gripper()) return false;
+    if (goal_handle->is_canceling()) return false;
+
+    feedback->status = "Attaching object to gripper";
+    goal_handle->publish_feedback(feedback);
+    if (!attach_object()) return false;
+    if (goal_handle->is_canceling()) return false;
+
+    feedback->status = "Lifting object";
+    goal_handle->publish_feedback(feedback);
+    if (!lift_up_non_cartesian()) return false;
+    if (goal_handle->is_canceling()) return false;
+
+    feedback->status = "Pick sequence complete";
+    goal_handle->publish_feedback(feedback);
     RCLCPP_INFO(get_logger(), "Pick complete!");
     return true;
   }
 
 private:
+
+  rclcpp_action::Server<Pick>::SharedPtr action_server_;
   // =========================
   // Members (own the state)
   // =========================
@@ -70,7 +128,52 @@ private:
   geometry_msgs::msg::Pose cube_pose_{};
   geometry_msgs::msg::Pose grasp_pose_{};
 
+//action callbacks
 private:
+  
+  rclcpp_action::GoalResponse handle_goal(
+    const rclcpp_action::GoalUUID & uuid,
+    std::shared_ptr<const Pick::Goal> goal)
+  {
+    RCLCPP_INFO(get_logger(), "Received pick goal request for cubeid %d", goal->cube_id);
+    (void)uuid; //what is this? 
+    // Accept all goals
+    return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+  }
+
+  rclcpp_action::CancelResponse handle_cancel(
+    const std::shared_ptr<GoalHandlePick> goal_handle)
+  {
+    RCLCPP_INFO(get_logger(), "Received request to cancel goal");
+    (void)goal_handle;
+    return rclcpp_action::CancelResponse::ACCEPT;
+  }
+
+  void handle_accepted(const std::shared_ptr<GoalHandlePick> goal_handle)
+  {
+    // This needs to return quickly to avoid blocking the executor, so spin up a new thread
+    std::thread{std::bind(&PickActionServer::execute, this, std::placeholders::_1), goal_handle}.detach();
+  }
+
+  void execute(const std::shared_ptr<GoalHandlePick> goal_handle)
+  {
+    const auto goal = goal_handle->get_goal();
+    uint8_t cube_id = goal->cube_id;
+    RCLCPP_INFO(get_logger(), "Executing pick for cube_id: %d", cube_id);
+
+    bool success = run_pick_sequence(cube_id, goal_handle);  // Pass cube_id and goal_handle for feedback/cancel
+    auto result = std::make_shared<Pick::Result>();
+    result->success = success;
+    if (success) {
+      goal_handle->succeed(result);
+    } else {
+      goal_handle->abort(result);
+    }
+  }
+
+
+private:
+
   bool wait_for_robot_state()
   {
     int attempts = 0;
@@ -217,28 +320,15 @@ private:
     return plan_and_execute_to_pose(lift_pose, arm_group_, get_logger());
   }
 };
-
-// pick main
+} // namespace pick_action_cpp
+// Updated main
 int main(int argc, char* argv[])
 {
   rclcpp::init(argc, argv);
-
   rclcpp::NodeOptions options;
   options.parameter_overrides({ rclcpp::Parameter("use_sim_time", true) });
-
-  auto node = std::make_shared<PickNode>(options);
-
-  // Best practice: explicit executor instead of detached spin
-  rclcpp::executors::SingleThreadedExecutor exec;
-  exec.add_node(node);
-
-  std::thread spin_thread([&exec]() { exec.spin(); });
-  
-  const bool ok = node->run_pick_sequence();
-
-  exec.cancel();
-  if (spin_thread.joinable()) spin_thread.join();
-
+  auto node = std::make_shared<pick_action_cpp::PickActionServer>(options);
+  rclcpp::spin(node);
   rclcpp::shutdown();
-  return ok ? 0 : 1;
+  return 0;
 }

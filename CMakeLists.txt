@@ -16,20 +16,27 @@ find_package(moveit_core REQUIRED)
 find_package(moveit_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(shape_msgs REQUIRED)
-# find_package(rclcpp_action REQUIRED)
+find_package(rclcpp_action REQUIRED)
 # find_package(rosidl_default_generators REQUIRED)
 
 
-# Create executable 'pick' from 'src/pick.cpp'
-add_executable(pick src/pick.cpp)
+# Create executable 'pick_action_server' from 'src/PickActionServer.cpp'
+add_executable(pick_action_server src/PickActionServer.cpp)
 # Link necessary libraries
-ament_target_dependencies(pick
+ament_target_dependencies(pick_action_server
   rclcpp
   moveit_ros_planning_interface
   moveit_core
   moveit_msgs
   geometry_msgs
   shape_msgs
+)
+
+# Create executable 'pick_action_client' from 'src/PickActionClient.cpp'
+add_executable(pick_action_client src/PickActionClient.cpp)
+ament_target_dependencies(pick_action_client
+  rclcpp
+  rclcpp_action
 )
 
 
@@ -51,11 +58,28 @@ target_include_directories(motion_util_lib PUBLIC
 )
 
 # Link the library to the pick executable
-target_link_libraries(pick motion_util_lib)
+target_link_libraries(pick_action_server motion_util_lib)
+
+
+find_package(rosidl_default_generators REQUIRED)
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "action/Pick.action"
+)
+
+rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+add_dependencies(pick_action_server ${PROJECT_NAME})
+add_dependencies(pick_action_client ${PROJECT_NAME})
+
+target_link_libraries(pick_action_server ${cpp_typesupport_target})
+target_link_libraries(pick_action_client ${cpp_typesupport_target})
+
 
 
 install(TARGETS
-  pick
+  pick_action_server
+  pick_action_client
   DESTINATION lib/${PROJECT_NAME}
 )
 
