@@ -20,9 +20,7 @@ find_package(tf2_ros REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(shape_msgs REQUIRED)
 find_package(rclcpp_action REQUIRED)
-# find_package(rosidl_default_generators REQUIRED)
-
-
+# find_package(ament_cmake_python REQUIRED)
 # Create executable 'pick_action_server' from 'src/PickActionServer.cpp'
 add_executable(pick_action_server src/PickActionServer.cpp)
 # Link necessary libraries
@@ -41,7 +39,6 @@ ament_target_dependencies(pick_action_client
   rclcpp
   rclcpp_action
 )
-
 
 # Add the motion_util library
 add_library(motion_util_lib STATIC src/motion_util.cpp)
@@ -63,22 +60,14 @@ target_include_directories(motion_util_lib PUBLIC
 # Link the library to the pick executable
 target_link_libraries(pick_action_server motion_util_lib)
 
-
-find_package(rosidl_default_generators REQUIRED)
-
 rosidl_generate_interfaces(${PROJECT_NAME}
   "action/Pick.action"
+  "srv/GetCubePoses.srv"
+  DEPENDENCIES geometry_msgs
 )
-
-rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 add_dependencies(pick_action_server ${PROJECT_NAME})
 add_dependencies(pick_action_client ${PROJECT_NAME})
-
-target_link_libraries(pick_action_server ${cpp_typesupport_target})
-target_link_libraries(pick_action_client ${cpp_typesupport_target})
-
-
 
 install(TARGETS
   pick_action_server
@@ -90,9 +79,7 @@ install(DIRECTORY include/
   DESTINATION include
 )
 
-install(DIRECTORY launch
-  DESTINATION share/${PROJECT_NAME}
-)
+
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -106,10 +93,6 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-rosidl_generate_interfaces(${PROJECT_NAME}
-  "srv/GetCubePoses.srv"
-  DEPENDENCIES geometry_msgs
-)
 
 add_executable(cube_detector src/CubeDetector.cpp)
 ament_target_dependencies(
@@ -120,19 +103,24 @@ ament_target_dependencies(
   tf2_ros
 )
 
-rosidl_get_typesupport_target(cpp_typesupport_target 
-  ${PROJECT_NAME} "rosidl_typesupport_cpp")
+add_dependencies(cube_detector ${PROJECT_NAME})
 
-target_link_libraries(cube_detector 
-  ${cpp_typesupport_target}
-)
+rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+target_link_libraries(pick_action_server ${cpp_typesupport_target})
+target_link_libraries(pick_action_client ${cpp_typesupport_target})
+target_link_libraries(cube_detector ${cpp_typesupport_target})
 
 install(TARGETS 
   cube_detector
   DESTINATION lib/${PROJECT_NAME}
 )
 
-install(DIRECTORY launch config
+install(DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(DIRECTORY config
   DESTINATION share/${PROJECT_NAME}
 )
 
