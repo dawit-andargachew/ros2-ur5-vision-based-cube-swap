@@ -1,0 +1,8 @@
+# Request
+int32[] target_ids         # List of AprilTag IDs to look for (e.g., [1, 2])
+---
+# Response
+bool success               # True if all requested IDs were found
+string message             # Status or error message
+int32[] detected_ids       # IDs that were actually found
+geometry_msgs/Pose[] poses # Poses corresponding to detected_ids

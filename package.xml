@@ -10,6 +10,9 @@
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <build_depend>rosidl_default_generators</build_depend>
+  <exec_depend>rosidl_default_runtime</exec_depend>
+  <member_of_group>rosidl_interface_packages</member_of_group>
 
   <depend>rclcpp</depend>
   <depend>rclcpp_action</depend>
@@ -17,6 +20,8 @@
   <depend>moveit_core</depend>
   <depend>moveit_msgs</depend>
   <depend>geometry_msgs</depend>
+  <depend>tf2</depend>
+  <depend>tf2_ros</depend>
   <depend>shape_msgs</depend>
   <depend>tf2</depend>
 
