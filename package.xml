@@ -23,6 +23,10 @@
   <depend>tf2_ros</depend>
   <depend>shape_msgs</depend>
 
+  <exec_depend>moveit_configs_utils</exec_depend>
+  <exec_depend>apriltag_ros</exec_depend>
+  <exec_depend>rclcpp_components</exec_depend>
+
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
