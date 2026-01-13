@@ -39,6 +39,20 @@ ament_target_dependencies(pick_action_client
   rclcpp_action
 )
 
+add_executable(place_action_server src/PlaceActionServer.cpp)
+ament_target_dependencies(place_action_server
+  rclcpp
+  rclcpp_action
+  moveit_ros_planning_interface
+  geometry_msgs
+)
+
+add_executable(place_action_client src/PlaceActionClient.cpp)
+ament_target_dependencies(place_action_client
+  rclcpp
+  rclcpp_action
+)
+
 
 # Add the motion_util library
 add_library(motion_util_lib STATIC src/motion_util.cpp)
@@ -59,12 +73,14 @@ target_include_directories(motion_util_lib PUBLIC
 
 # Link the library to the pick executable
 target_link_libraries(pick_action_server motion_util_lib)
+target_link_libraries(place_action_server motion_util_lib)
 
 
 find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "action/Pick.action"
+  "action/Place.action"
 )
 
 rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
@@ -74,12 +90,16 @@ add_dependencies(pick_action_client ${PROJECT_NAME})
 
 target_link_libraries(pick_action_server ${cpp_typesupport_target})
 target_link_libraries(pick_action_client ${cpp_typesupport_target})
+target_link_libraries(place_action_server ${cpp_typesupport_target})
+target_link_libraries(place_action_client ${cpp_typesupport_target})
 
 
 
 install(TARGETS
   pick_action_server
   pick_action_client
+  place_action_server
+  place_action_client
   DESTINATION lib/${PROJECT_NAME}
 )
 

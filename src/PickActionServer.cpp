@@ -296,8 +296,8 @@ private:
 
   bool attach_object()
   {
-    RCLCPP_INFO(get_logger(), "Attaching '%s' to end effector...", kCubeId);
-    return attachObject(kCubeId, arm_group_, get_logger());
+    RCLCPP_INFO(get_logger(), "Attaching '%s' to end effector...", kCubeId1);
+    return attachObject(kCubeId1, arm_group_, get_logger());
   }
 
   bool lift_up_cartesian()

@@ -40,30 +40,54 @@ namespace motion_util {
         // ---- 1) Table collision object
         moveit_msgs::msg::CollisionObject table;
         table.header.frame_id = kWorldFrame;
-        table.id = kTableId;
+        table.id = kTableId1;
+        moveit_msgs::msg::CollisionObject table2;
+        table2.header.frame_id =kWorldFrame;
+        table2.id = kTableId2;
 
         shape_msgs::msg::SolidPrimitive table_prim;
         table_prim.type = shape_msgs::msg::SolidPrimitive::BOX;
-        table_prim.dimensions = {0.3652, 0.3652, 0.016}; //static world table
+        table_prim.dimensions = {0.3652, 0.3652, 0.322}; //static world table
+        //table_prim.dimensions = {0.3652, 0.3652, 0.016};
+        shape_msgs::msg::SolidPrimitive table_prim2;
+        table_prim2.type = shape_msgs::msg::SolidPrimitive::BOX;
+        table_prim2.dimensions = {0.3652, 0.3652, 0.322}; //static world table
+        //table_prim2.dimensions = {0.3652, 0.3652, 0.016};
 
         geometry_msgs::msg::Pose table_pose; //manual pose b/c static -> but maybe we can calculate based on the initial cube poses
         table_pose.position.x = 3.97;
         table_pose.position.y = -1.10;
-        table_pose.position.z = 0.322;
+        table_pose.position.z = 0.0;
+        //table_pose.position.z = 0.322;
         table_pose.orientation.w = 1.0;
+        geometry_msgs::msg::Pose table_pose2; //manual pose b/c static -> but maybe we can calculate based on the initial cube poses
+        table_pose2.position.x = 4.57;
+        table_pose2.position.y = -0.51;
+        table_pose2.position.z = 0.0;
+        //table_pose2.position.z = 0.322;
+        table_pose2.orientation.w = 1.0;
 
         table.primitives.push_back(table_prim);
         table.primitive_poses.push_back(table_pose);
         table.operation = moveit_msgs::msg::CollisionObject::ADD;
+        table2.primitives.push_back(table_prim2);
+        table2.primitive_poses.push_back(table_pose2);
+        table2.operation = moveit_msgs::msg::CollisionObject::ADD;
 
         // ---- 2) Cube collision object (also store pose for later planning)
         moveit_msgs::msg::CollisionObject cube;
         cube.header.frame_id = kWorldFrame;
-        cube.id = kCubeId;
+        cube.id = kCubeId1;
+        moveit_msgs::msg::CollisionObject cube2;
+        cube2.header.frame_id = kWorldFrame;
+        cube2.id = kCubeId2;
 
         shape_msgs::msg::SolidPrimitive cube_prim;
         cube_prim.type = shape_msgs::msg::SolidPrimitive::BOX;
         cube_prim.dimensions = {0.06, 0.06, 0.1};
+        shape_msgs::msg::SolidPrimitive cube_prim2;
+        cube_prim2.type = shape_msgs::msg::SolidPrimitive::BOX;
+        cube_prim2.dimensions = {0.06, 0.06, 0.1};
 
         geometry_msgs::msg::Pose cube_pose_{};
         constexpr double kOffsetXLateral = +0.035; //trial and error
@@ -72,12 +96,22 @@ namespace motion_util {
         cube_pose_.position.y = -1.10;
         cube_pose_.position.z = 0.4;
         cube_pose_.orientation.w = 1.0;
+        geometry_msgs::msg::Pose cube2_pose_{};
+        cube2_pose_ = geometry_msgs::msg::Pose{};
+        cube2_pose_.position.x = 4.57 + kOffsetXLateral;
+        cube2_pose_.position.y = -0.51;
+        cube2_pose_.position.z = 0.4;
+        cube2_pose_.orientation.w = 1.0;
 
         cube.primitives.push_back(cube_prim);
         cube.primitive_poses.push_back(cube_pose_);
         cube.operation = moveit_msgs::msg::CollisionObject::ADD;
+        cube2.primitives.push_back(cube_prim2);
+        cube2.primitive_poses.push_back(cube2_pose_);
+        cube2.operation = moveit_msgs::msg::CollisionObject::ADD;
 
         planning_scene_.applyCollisionObjects({table, cube});
+        planning_scene_.applyCollisionObjects({table2, cube2});
 
         // Give PlanningSceneInterface a beat to help sim
         rclcpp::sleep_for(500ms);
