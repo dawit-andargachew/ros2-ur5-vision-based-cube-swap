@@ -78,13 +78,13 @@ private:
   // 0.30 meters from cube center to wrist. 
   // If gripper hits the cube, INCREASE this (e.g., 0.32).
   // If gripper grasps air above cube, DECREASE this (e.g., 0.28).
-  static constexpr double kGripperLengthOffset = 0.17; // it was 0.30 before 
+  static constexpr double kGripperLengthOffset = 0.05; // it was 0.30 before 
   
   // --- SIDE ADJUSTMENT (LEFT/RIGHT) ---
   // Positive = Left (in standard UR frame)
   // Negative = Right
   // 0.02 = 2cm Left. Adjust this if it's not centered!
-  static constexpr double kLateralOffset = 0.00;  // it was 0.02 before
+  static constexpr double kLateralOffset = 0.015;  // it was 0.02 before
 
   static constexpr double kGraspCenterZOffset = 0.05; 
   static constexpr double kPreGraspApproachDist = 0.15;
@@ -149,9 +149,8 @@ private:
     cube_prim.type = shape_msgs::msg::SolidPrimitive::BOX;
     cube_prim.dimensions = {0.06, 0.06, 0.1};
 
-    constexpr double kOffsetXLateral =  0; // removed it was 0.035
     cube_pose_ = geometry_msgs::msg::Pose{};
-    cube_pose_.position.x = 3.97 + kOffsetXLateral;
+    cube_pose_.position.x = 3.97;
     cube_pose_.position.y = -1.10;
     cube_pose_.position.z = 0.4;
     cube_pose_.orientation.w = 1.0;
@@ -172,9 +171,9 @@ private:
   {
     RCLCPP_INFO(get_logger(), "Moving to 'Elbow Up' Ready Pose...");
     std::map<std::string, double> target_joints;
-    target_joints["shoulder_pan_joint"] = -1.64;
+    target_joints["shoulder_pan_joint"] = -1.73; // -1.64;
     target_joints["shoulder_lift_joint"] = -1.46; 
-    target_joints["elbow_joint"]         =  1.12; 
+    target_joints["elbow_joint"]         =  0.85; //1.12; 
     target_joints["wrist_1_joint"]       = -1.48;
     target_joints["wrist_2_joint"]       = -1.37;
     target_joints["wrist_3_joint"]       = -0.38;
@@ -202,7 +201,7 @@ private:
    
     tf2::Quaternion q;
     // Orientation: 3.14 (180 deg) points down. 
-    q.setRPY(0.0, 1.57, 0.0); 
+    q.setRPY(0.0, 3.1415, 0.0);
     q.normalize();
 
     grasp_pose.orientation.x = q.x();
@@ -233,13 +232,23 @@ private:
     return exec_result == moveit::core::MoveItErrorCode::SUCCESS;
   }
 
-  bool open_gripper() {
-    gripper_group_.setNamedTarget("open"); // Use the name from your SRDF
-    moveit::planning_interface::MoveGroupInterface::Plan my_plan;
-    bool success = (gripper_group_.plan(my_plan) == moveit::core::MoveItErrorCode::SUCCESS);
-    if(success) return gripper_group_.execute(my_plan) == moveit::core::MoveItErrorCode::SUCCESS;
-    return false; 
-}
+  bool open_gripper() 
+  {
+      RCLCPP_INFO(get_logger(), "Opening gripper...");
+      gripper_group_.setStartStateToCurrentState();
+  
+      // Use the explicit joint value (0.0) instead of the name "open"
+      std::map<std::string, double> joint_values;
+      joint_values[kActiveJointName] = kOpenVal; 
+  
+      gripper_group_.setJointValueTarget(joint_values);
+      
+      // Using move() is simpler and often more reliable for single joints
+      const auto result = gripper_group_.move(); 
+      
+      log_result(get_logger(), "Open gripper", result);
+      return result == moveit::core::MoveItErrorCode::SUCCESS;
+  }
 
   bool move_to_grasp_cartesian()
   {
