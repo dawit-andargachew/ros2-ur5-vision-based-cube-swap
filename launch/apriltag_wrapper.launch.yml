@@ -1,0 +1,25 @@
+launch:
+
+- node_container:
+    pkg: rclcpp_components
+    exec: component_container
+    name: apriltag_container
+    namespace: ""
+    output: "log"
+    composable_node:
+    #removed realsense node because we are using sim
+    - pkg: apriltag_ros
+      plugin: AprilTagNode
+      name: apriltag
+      namespace: apriltag
+      remap:
+      - from: /apriltag/image_rect
+        to: /rgb_camera/image
+      - from: /apriltag/camera_info
+        to: /rgb_camera/camera_info
+
+      param:
+      - from: $(find-pkg-share group_6_assignment_2)/config/custom_tags_36h11.yaml
+      extra_arg:
+      - name: use_intra_process_comms
+        value: "True"
