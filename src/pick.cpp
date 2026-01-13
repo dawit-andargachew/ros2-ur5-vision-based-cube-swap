@@ -78,15 +78,15 @@ private:
   // 0.30 meters from cube center to wrist. 
   // If gripper hits the cube, INCREASE this (e.g., 0.32).
   // If gripper grasps air above cube, DECREASE this (e.g., 0.28).
-  static constexpr double kGripperLengthOffset = 0.30; 
+  static constexpr double kGripperLengthOffset = 0.17; // it was 0.30 before 
   
   // --- SIDE ADJUSTMENT (LEFT/RIGHT) ---
   // Positive = Left (in standard UR frame)
   // Negative = Right
   // 0.02 = 2cm Left. Adjust this if it's not centered!
-  static constexpr double kLateralOffset = 0.02; 
+  static constexpr double kLateralOffset = 0.00;  // it was 0.02 before
 
-  static constexpr double kGraspCenterZOffset = 0.0; 
+  static constexpr double kGraspCenterZOffset = 0.05; 
   static constexpr double kPreGraspApproachDist = 0.15;
 
   // =========================
@@ -149,7 +149,7 @@ private:
     cube_prim.type = shape_msgs::msg::SolidPrimitive::BOX;
     cube_prim.dimensions = {0.06, 0.06, 0.1};
 
-    constexpr double kOffsetXLateral = +0.035;
+    constexpr double kOffsetXLateral =  0; // removed it was 0.035
     cube_pose_ = geometry_msgs::msg::Pose{};
     cube_pose_.position.x = 3.97 + kOffsetXLateral;
     cube_pose_.position.y = -1.10;
@@ -202,7 +202,7 @@ private:
    
     tf2::Quaternion q;
     // Orientation: 3.14 (180 deg) points down. 
-    q.setRPY(0.0, 3.1415, 0.0); 
+    q.setRPY(0.0, 1.57, 0.0); 
     q.normalize();
 
     grasp_pose.orientation.x = q.x();
@@ -233,32 +233,13 @@ private:
     return exec_result == moveit::core::MoveItErrorCode::SUCCESS;
   }
 
-  bool open_gripper()
-  {
-    RCLCPP_INFO(get_logger(), "Opening gripper...");
-    
-    // Ensure we are working with the latest state
-    gripper_group_.setStartStateToCurrentState();
-
-    std::map<std::string, double> joint_values;
-    joint_values[kActiveJointName] = kOpenVal;
-
-    gripper_group_.setJointValueTarget(joint_values);
-    
-    // Using plan/execute instead of move() sometimes gives better feedback
-    moveit::planning_interface::MoveGroupInterface::Plan plan;
-    auto err = gripper_group_.plan(plan);
-    if (err == moveit::core::MoveItErrorCode::SUCCESS) {
-        auto result = gripper_group_.execute(plan);
-        log_result(get_logger(), "Open gripper", result);
-        return result == moveit::core::MoveItErrorCode::SUCCESS;
-    } else {
-        // If planning fails, it might be because we are already there. 
-        // We consider this a success to keep the program running.
-        RCLCPP_WARN(get_logger(), "Gripper open plan failed (might already be open). Continuing...");
-        return true; 
-    }
-  }
+  bool open_gripper() {
+    gripper_group_.setNamedTarget("open"); // Use the name from your SRDF
+    moveit::planning_interface::MoveGroupInterface::Plan my_plan;
+    bool success = (gripper_group_.plan(my_plan) == moveit::core::MoveItErrorCode::SUCCESS);
+    if(success) return gripper_group_.execute(my_plan) == moveit::core::MoveItErrorCode::SUCCESS;
+    return false; 
+}
 
   bool move_to_grasp_cartesian()
   {
