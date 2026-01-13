@@ -6,14 +6,6 @@ from launch.substitutions import PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
 from launch.actions import ExecuteProcess
 def generate_launch_description():
-    
-    simulation = ExecuteProcess(
-        cmd=['ros2', 'launch', 'ir_launch', 'assignment_1.launch.py', 'autostart:=True'],
-        output='log',       # Sends stdout/stderr to ROS 2 log files
-        emulate_tty=False   # Prevents output from appearing in terminal
-    )
-
-
     # 1. Include the Simulation Launch File from ir_launch
     simulation = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -24,7 +16,6 @@ def generate_launch_description():
             ])
         )
     )
-
 
     # 2. Define the Pick Node
     pick_node = Node(
