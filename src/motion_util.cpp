@@ -47,24 +47,24 @@ namespace motion_util {
 
         shape_msgs::msg::SolidPrimitive table_prim;
         table_prim.type = shape_msgs::msg::SolidPrimitive::BOX;
-        table_prim.dimensions = {0.3652, 0.3652, 0.322}; //static world table
-        //table_prim.dimensions = {0.3652, 0.3652, 0.016};
+        //table_prim.dimensions = {0.3652, 0.3652, 0.4}; //static world table
+        table_prim.dimensions = {0.3652, 0.3652, 0.016};
         shape_msgs::msg::SolidPrimitive table_prim2;
         table_prim2.type = shape_msgs::msg::SolidPrimitive::BOX;
-        table_prim2.dimensions = {0.3652, 0.3652, 0.322}; //static world table
-        //table_prim2.dimensions = {0.3652, 0.3652, 0.016};
+        //table_prim2.dimensions = {0.3652, 0.3652, 0.338}; //static world table
+        table_prim2.dimensions = {0.3652, 0.3652, 0.016};
 
         geometry_msgs::msg::Pose table_pose; //manual pose b/c static -> but maybe we can calculate based on the initial cube poses
         table_pose.position.x = 3.97;
         table_pose.position.y = -1.10;
-        table_pose.position.z = 0.0;
-        //table_pose.position.z = 0.322;
+        //table_pose.position.z = 0.016;
+        table_pose.position.z = 0.322;
         table_pose.orientation.w = 1.0;
         geometry_msgs::msg::Pose table_pose2; //manual pose b/c static -> but maybe we can calculate based on the initial cube poses
         table_pose2.position.x = 4.57;
         table_pose2.position.y = -0.51;
-        table_pose2.position.z = 0.0;
-        //table_pose2.position.z = 0.322;
+        //table_pose2.position.z = 0.016;
+        table_pose2.position.z = 0.322;
         table_pose2.orientation.w = 1.0;
 
         table.primitives.push_back(table_prim);
