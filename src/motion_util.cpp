@@ -18,6 +18,10 @@ namespace motion_util {
         (void)gripper_mgi.getCurrentState(2.0);  // Added: matches MotionInterface.cpp
     }
 
+    // In motion_util.cpp, update configure_moveit function:
+
+
+
     void apply_path_constraints(moveit::planning_interface::MoveGroupInterface& arm_group_, const rclcpp::Logger& logger)
     {
         moveit_msgs::msg::Constraints path_constraints;

@@ -8,6 +8,7 @@
 #include <rclcpp/rclcpp.hpp>
 
 #include <geometry_msgs/msg/pose.hpp>
+#include <geometry_msgs/msg/pose_stamped.hpp>
 #include <moveit/move_group_interface/move_group_interface.hpp>
 #include <moveit/planning_scene_interface/planning_scene_interface.hpp>
 #include <moveit_msgs/msg/collision_object.hpp>
@@ -38,6 +39,10 @@ public:
     arm_group_(std::shared_ptr<rclcpp::Node>(this, [](rclcpp::Node*) {}), kArmGroupName),
     gripper_group_(std::shared_ptr<rclcpp::Node>(this, [](rclcpp::Node*) {}), kGripperGroupName)
   { 
+    const auto pose_qos = rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable();
+    grasp_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("debug/grasp_pose", pose_qos);
+    pregrasp_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("debug/pregrasp_pose", pose_qos);
+
     // Create action server
     this-> action_server_ = rclcpp_action::create_server<Pick>(
       this,
@@ -48,6 +53,8 @@ public:
 
     configure_moveit(arm_group_, gripper_group_);  // Updated: Use motion_util::configure_moveit
     //apply_path_constraints(arm_group_, get_logger());  // ADDED: Apply path constraints
+
+    declare_and_get_parameters();
   }
 
   bool run_pick_sequence(uint8_t cube_id, const std::shared_ptr<GoalHandlePick> goal_handle)
@@ -128,6 +135,110 @@ private:
   geometry_msgs::msg::Pose cube_pose_{};
   geometry_msgs::msg::Pose grasp_pose_{};
 
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr grasp_pose_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pregrasp_pose_pub_;
+
+  void publish_debug_pose(
+    const geometry_msgs::msg::Pose& pose,
+    const rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr& publisher,
+    const std::string& frame_id)
+  {
+    if (!publisher) {
+      return;
+    }
+    geometry_msgs::msg::PoseStamped msg;
+    msg.header.stamp = this->now();
+    msg.header.frame_id = frame_id;
+    msg.pose = pose;
+    publisher->publish(msg);
+  }
+
+  struct PickParams
+  {
+    // Scene
+    double table_x = 3.97;
+    double table_y = -1.10;
+    double table_z = 0.322;
+
+    double cube_base_x = 3.97;
+    double cube_base_y = -1.10;
+    double cube_base_z = 0.4;
+    double cube_offset_x = 0.035;
+
+    // Grasp
+    double grasp_roll = 0.0;
+    double grasp_pitch = -1.5707;
+    double grasp_yaw = 0.0;
+    double grasp_center_z_offset = -0.02;
+    double tool_length_offset = 0.18;
+
+    // Motions
+    double pregrasp_approach_dist_z = 0.15;
+    double lift_dist_z = 0.20;
+
+    // Gripper
+    double gripper_open = 0.0;
+    double gripper_closed = 0.10;
+  } params_;
+
+  void declare_and_get_parameters()
+  {
+    // Scene
+    this->declare_parameter<double>("scene.table.x", params_.table_x);
+    this->declare_parameter<double>("scene.table.y", params_.table_y);
+    this->declare_parameter<double>("scene.table.z", params_.table_z);
+
+    this->declare_parameter<double>("scene.cube.base_x", params_.cube_base_x);
+    this->declare_parameter<double>("scene.cube.base_y", params_.cube_base_y);
+    this->declare_parameter<double>("scene.cube.base_z", params_.cube_base_z);
+    this->declare_parameter<double>("scene.cube.offset_x", params_.cube_offset_x);
+
+    // Grasp
+    this->declare_parameter<double>("grasp.rpy.roll", params_.grasp_roll);
+    this->declare_parameter<double>("grasp.rpy.pitch", params_.grasp_pitch);
+    this->declare_parameter<double>("grasp.rpy.yaw", params_.grasp_yaw);
+    this->declare_parameter<double>("grasp.center_z_offset", params_.grasp_center_z_offset);
+    this->declare_parameter<double>("grasp.tool_length_offset", params_.tool_length_offset);
+
+    // Motions
+    this->declare_parameter<double>("motion.pregrasp_approach_dist_z", params_.pregrasp_approach_dist_z);
+    this->declare_parameter<double>("motion.lift_dist_z", params_.lift_dist_z);
+
+    // Gripper
+    this->declare_parameter<double>("gripper.open", params_.gripper_open);
+    this->declare_parameter<double>("gripper.closed", params_.gripper_closed);
+
+    // Fetch values (including YAML overrides)
+    this->get_parameter("scene.table.x", params_.table_x);
+    this->get_parameter("scene.table.y", params_.table_y);
+    this->get_parameter("scene.table.z", params_.table_z);
+
+    this->get_parameter("scene.cube.base_x", params_.cube_base_x);
+    this->get_parameter("scene.cube.base_y", params_.cube_base_y);
+    this->get_parameter("scene.cube.base_z", params_.cube_base_z);
+    this->get_parameter("scene.cube.offset_x", params_.cube_offset_x);
+
+    this->get_parameter("grasp.rpy.roll", params_.grasp_roll);
+    this->get_parameter("grasp.rpy.pitch", params_.grasp_pitch);
+    this->get_parameter("grasp.rpy.yaw", params_.grasp_yaw);
+    this->get_parameter("grasp.center_z_offset", params_.grasp_center_z_offset);
+    this->get_parameter("grasp.tool_length_offset", params_.tool_length_offset);
+
+    this->get_parameter("motion.pregrasp_approach_dist_z", params_.pregrasp_approach_dist_z);
+    this->get_parameter("motion.lift_dist_z", params_.lift_dist_z);
+
+    this->get_parameter("gripper.open", params_.gripper_open);
+    this->get_parameter("gripper.closed", params_.gripper_closed);
+
+    RCLCPP_INFO(
+      get_logger(),
+      "Pick params: cube(base)=%.3f,%.3f,%.3f offset_x=%.3f | grasp rpy=%.3f,%.3f,%.3f | z_off=%.3f tool=%.3f | pre_z=%.3f lift_z=%.3f",
+      params_.cube_base_x, params_.cube_base_y, params_.cube_base_z, params_.cube_offset_x,
+      params_.grasp_roll, params_.grasp_pitch, params_.grasp_yaw,
+      params_.grasp_center_z_offset, params_.tool_length_offset,
+      params_.pregrasp_approach_dist_z, params_.lift_dist_z);
+  }
+
 //action callbacks
 private:
   
@@ -202,16 +313,24 @@ private:
       return false;
     }
 
-    // Keep local cube pose computation (consistent with motion_util::setup_scene)
-    constexpr double kOffsetXLateral = +0.035; //trial and error
+    // Override default scene object poses using parameters so collision + grasp stay consistent.
+    geometry_msgs::msg::Pose table_pose;
+    table_pose.position.x = params_.table_x;
+    table_pose.position.y = params_.table_y;
+    table_pose.position.z = params_.table_z;
+    table_pose.orientation.w = 1.0;
+    motion_util::moveCollisionObject(kTableId, table_pose, kWorldFrame, planning_scene_);
+
     cube_pose_ = geometry_msgs::msg::Pose{};
-    cube_pose_.position.x = 3.97 + kOffsetXLateral;
-    cube_pose_.position.y = -1.10;
-    cube_pose_.position.z = 0.4;
+    cube_pose_.position.x = params_.cube_base_x + params_.cube_offset_x;
+    cube_pose_.position.y = params_.cube_base_y;
+    cube_pose_.position.z = params_.cube_base_z;
     cube_pose_.orientation.w = 1.0;
+    motion_util::moveCollisionObject(kCubeId, cube_pose_, kWorldFrame, planning_scene_);
 
     // Precompute grasp pose to keep locality: used by pre-grasp/grasp/lift)
     grasp_pose_ = compute_grasp_pose(cube_pose_);
+    publish_debug_pose(grasp_pose_, grasp_pose_pub_, kWorldFrame);
     
     RCLCPP_INFO(get_logger(), "Cube pose: x=%.3f, y=%.3f, z=%.3f", 
                 cube_pose_.position.x, cube_pose_.position.y, cube_pose_.position.z);
@@ -221,16 +340,41 @@ private:
     return true;
   }
 
+  // geometry_msgs::msg::Pose compute_grasp_pose(const geometry_msgs::msg::Pose& cube_pose) const
+  // {
+  //   geometry_msgs::msg::Pose grasp_pose = cube_pose;
+  //   // Top-down pick:
+  //   // - Keep x/y aligned with the cube center
+  //   // - Offset along +Z by the gripper/tool length so the end-effector link (typically at the wrist)
+  //   //   ends up above the grasp point while the fingers can close around the cube.
+  //   grasp_pose.position.y = cube_pose.position.y;
+  //   grasp_pose.position.z = cube_pose.position.z + params_.grasp_center_z_offset + params_.tool_length_offset;
+
+  //   // Orientation for top grasp: gripper approaching downwards
+  //   tf2::Quaternion q;
+  //   const double roll = params_.grasp_roll;
+  //   const double pitch = params_.grasp_pitch;
+  //   const double yaw = params_.grasp_yaw;
+  //   q.setRPY(roll, pitch, yaw);
+  //   q.normalize();
+
+  //   grasp_pose.orientation.x = q.x();
+  //   grasp_pose.orientation.y = q.y();
+  //   grasp_pose.orientation.z = q.z();
+  //   grasp_pose.orientation.w = q.w();
+
+  //   return grasp_pose;
+  // }
   geometry_msgs::msg::Pose compute_grasp_pose(const geometry_msgs::msg::Pose& cube_pose) const
   {
     geometry_msgs::msg::Pose grasp_pose = cube_pose;
-    grasp_pose.position.z = cube_pose.position.z + kGraspCenterZOffset;
-    grasp_pose.position.y = cube_pose.position.y + kGripperLengthOffset;
-    // Orientation for top grasp: gripper fingers pointing down, aligned with table
+    grasp_pose.position.z = cube_pose.position.z + params_.grasp_center_z_offset;
+    grasp_pose.position.y = cube_pose.position.y + params_.tool_length_offset;
+    // Orientation for side grasp: gripper fingers pointing down, aligned with table
     tf2::Quaternion q;
-    const double roll = 1.5707;  
-    const double pitch = 0.0;
-    const double yaw = 0.0;
+    const double roll = params_.grasp_roll;
+    const double pitch = params_.grasp_pitch;
+    const double yaw = params_.grasp_yaw;
     q.setRPY(roll, pitch, yaw);
     q.normalize();
 
@@ -251,7 +395,10 @@ private:
     }
     
     geometry_msgs::msg::Pose pre_grasp_pose = grasp_pose_;
-    pre_grasp_pose.position.y += kPreGraspApproachDist;
+    // Approach from the side (increase Y), then move inward to grasp_pose_.
+    pre_grasp_pose.position.y += params_.pregrasp_approach_dist_z;
+
+    publish_debug_pose(pre_grasp_pose, pregrasp_pose_pub_, kWorldFrame);
 
     RCLCPP_INFO(get_logger(), "Planning to pre-grasp pose: x=%.3f, y=%.3f, z=%.3f",
                 pre_grasp_pose.position.x, pre_grasp_pose.position.y, pre_grasp_pose.position.z);
@@ -263,7 +410,7 @@ private:
   bool open_gripper()
   {
     RCLCPP_INFO(get_logger(), "Opening gripper...");
-    return setGripper(kOpenVal, gripper_group_, get_logger());
+    return setGripper(params_.gripper_open, gripper_group_, get_logger());
   }
 
   bool move_to_grasp_cartesian()
@@ -284,7 +431,7 @@ private:
   bool close_gripper()
   {
     RCLCPP_INFO(get_logger(), "Closing gripper...");
-    bool result = setGripper(kClosedVal, gripper_group_, get_logger());
+    bool result = setGripper(params_.gripper_closed, gripper_group_, get_logger());
     
     // Add a brief pause after closing to ensure grip
     if (result) {
@@ -304,7 +451,8 @@ private:
   {
     RCLCPP_INFO(get_logger(), "Lifting object (Cartesian)...");
     geometry_msgs::msg::Pose lift_pose = grasp_pose_;
-    lift_pose.position.z += 0.20;
+    // Lift up in Z direction after side grasp
+    lift_pose.position.z += params_.lift_dist_z;
 
     std::vector<geometry_msgs::msg::Pose> waypoints;
     waypoints.push_back(lift_pose);
@@ -315,7 +463,8 @@ private:
   {
     RCLCPP_INFO(get_logger(), "Lifting object (Non-Cartesian)...");
     geometry_msgs::msg::Pose lift_pose = grasp_pose_;
-    lift_pose.position.z += 0.20;
+    // Lift up in Z direction after side grasp
+    lift_pose.position.z += params_.lift_dist_z;
 
     return plan_and_execute_to_pose(lift_pose, arm_group_, get_logger());
   }

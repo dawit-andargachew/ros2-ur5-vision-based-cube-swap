@@ -1,0 +1,28 @@
+pick_action_server:
+  ros__parameters:
+    # Scene tuning (keep these consistent with your sim/world)
+    scene.table.x: 3.97
+    scene.table.y: -1.10
+    scene.table.z: 0.322
+
+    scene.cube.base_x: 3.97
+    scene.cube.base_y: -1.10
+    scene.cube.base_z: 0.4
+    scene.cube.offset_x: 0.035
+
+    # Side grasp orientation (RPY, radians)
+    # Absolute orientation for Y-axis side approach
+    grasp.rpy.roll: 1.5707    # 90 deg roll to orient gripper for side grasp
+    grasp.rpy.pitch: 0.0      # Horizontal approach
+    grasp.rpy.yaw: 0.0        # No yaw rotation
+    # Grasp positioning offsets (meters)
+    grasp.center_z_offset: -0.02
+    grasp.tool_length_offset: 0.18  # Y offset from cube center
+
+    # Motion distances (meters)
+    motion.pregrasp_approach_dist_z: 0.15  # Pre-grasp Y standoff distance
+    motion.lift_dist_z: 0.20               # Lift distance in Z after grasp
+
+    # Gripper joint targets
+    gripper.open: 0.0
+    gripper.closed: 0.10
