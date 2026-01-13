@@ -1,0 +1,8 @@
+# Request
+uint8 cube_id
+---
+# Result
+bool success
+---
+# Feedback
+string status
