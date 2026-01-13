@@ -14,8 +14,8 @@ namespace motion_util {
         arm_mgi.setMaxAccelerationScalingFactor(0.5);
         arm_mgi.setPlanningTime(20.0);
 
-        (void)arm_mgi.getCurrentState(2.0);  // Added: matches MotionInterface.cpp
-        (void)gripper_mgi.getCurrentState(2.0);  // Added: matches MotionInterface.cpp
+        // (void)arm_mgi.getCurrentState(2.0);  // Added: matches MotionInterface.cpp
+        // (void)gripper_mgi.getCurrentState(2.0);  // Added: matches MotionInterface.cpp
     }
 
     // In motion_util.cpp, update configure_moveit function:
