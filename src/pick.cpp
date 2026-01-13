@@ -44,6 +44,18 @@ public:
     return true;
   }
 
+  bool run_place_sequence()
+  {
+    if (!lower_down_cartesian()) return false;
+    if (!detach_object()) return false;
+    if (!open_gripper()) return false;
+    if (!retreat_from_place()) return false;
+
+    RCLCPP_INFO(get_logger(), "Place complete!");
+    return true;
+  }
+
+
 private:
   // =========================
   // Constants (stable config)
@@ -71,6 +83,8 @@ private:
 
   geometry_msgs::msg::Pose cube_pose_{};
   geometry_msgs::msg::Pose grasp_pose_{};
+  geometry_msgs::msg::Pose cube2_pose_{};
+  geometry_msgs::msg::Pose grasp_pose2_{};
 
 private:
   void configure_moveit()
@@ -81,10 +95,10 @@ private:
 
     // Optional: reduce flakiness waiting for current state
     // (MoveGroupInterface may need a moment to receive robot state)
-    (void)arm_group_.getCurrentState(2.0);
-    (void)gripper_group_.getCurrentState(2.0);
+    //(void)arm_group_.getCurrentState(2.0);
+    //(void)gripper_group_.getCurrentState(2.0);
 
-    apply_path_constraints();
+    //apply_path_constraints();
   }
 
 
@@ -153,6 +167,12 @@ private:
     cube_pose_.position.z = 0.4;
     cube_pose_.orientation.w = 1.0;
 
+    cube2_pose_ = geometry_msgs::msg::Pose{};
+    cube2_pose_.position.x = 4.57 + kOffsetXLateral;
+    cube2_pose_.position.y = -0.51;
+    cube2_pose_.position.z = 0.44;
+    cube2_pose_.orientation.w = 1.0;
+
     cube.primitives.push_back(cube_prim);
     cube.primitive_poses.push_back(cube_pose_);
     cube.operation = moveit_msgs::msg::CollisionObject::ADD;
@@ -164,6 +184,7 @@ private:
 
     // Precompute grasp pose to keep locality: used by pre-grasp/grasp/lift)
     grasp_pose_ = compute_grasp_pose(cube_pose_);
+    grasp_pose2_ = compute_grasp_pose(cube2_pose_);
     return true;
   }
 
@@ -280,6 +301,22 @@ private:
     return ok;
   }
 
+  bool detach_object()
+  {
+    RCLCPP_INFO(get_logger(), "Detaching '%s' from end effector...", kCubeId);
+
+    const bool ok = arm_group_.detachObject(kCubeId);
+    if (!ok) {
+      RCLCPP_WARN(get_logger(), "detachObject() returned false.");
+    } else {
+      RCLCPP_INFO(get_logger(), ">> Detach object: SUCCESS");
+    }
+
+    // Give PlanningScene time to update
+    rclcpp::sleep_for(500ms);
+    return ok;
+  }
+
   bool lift_up_cartesian()
   {
     RCLCPP_INFO(get_logger(), "Lifting object (Cartesian)...");
@@ -302,6 +339,50 @@ private:
     log_result(get_logger(), "Execute lift", exec_result);
     return exec_result == moveit::core::MoveItErrorCode::SUCCESS;
   }
+
+  bool lower_down_cartesian()
+  {
+    RCLCPP_INFO(get_logger(), "Lowering object back to table (Cartesian)...");
+
+    std::vector<geometry_msgs::msg::Pose> waypoints;
+    waypoints.push_back(grasp_pose2_);
+
+    moveit_msgs::msg::RobotTrajectory traj;
+    const double fraction =
+      arm_group_.computeCartesianPath(waypoints, 0.01, 0.0, traj);
+
+    RCLCPP_INFO(get_logger(), "Lower path fraction: %.1f%%", fraction * 100.0);
+    if (fraction < 0.9) {
+      RCLCPP_ERROR(get_logger(), "Lowering failed.");
+      return false;
+    }
+
+    const auto exec_result = arm_group_.execute(traj);
+    log_result(get_logger(), "Execute lower", exec_result);
+    return exec_result == moveit::core::MoveItErrorCode::SUCCESS;
+  }
+
+  bool retreat_from_place()
+  {
+    RCLCPP_INFO(get_logger(), "Retreating from placed object...");
+
+    geometry_msgs::msg::Pose retreat_pose = grasp_pose_;
+    retreat_pose.position.y += kPreGraspApproachDist;
+
+    arm_group_.setPoseTarget(retreat_pose);
+
+    moveit::planning_interface::MoveGroupInterface::Plan plan;
+    const auto plan_result = arm_group_.plan(plan);
+    if (plan_result != moveit::core::MoveItErrorCode::SUCCESS) {
+      log_result(get_logger(), "Plan retreat", plan_result);
+      return false;
+    }
+
+    const auto exec_result = arm_group_.execute(plan);
+    log_result(get_logger(), "Execute retreat", exec_result);
+    return exec_result == moveit::core::MoveItErrorCode::SUCCESS;
+  }
+
 };
 
 int main(int argc, char* argv[])
@@ -319,7 +400,12 @@ int main(int argc, char* argv[])
 
   std::thread spin_thread([&exec]() { exec.spin(); });
 
-  const bool ok = node->run_pick_sequence();
+  //const bool ok = node->run_pick_sequence();
+  bool ok = node->run_pick_sequence();
+  if (ok) {
+    ok = node->run_place_sequence();
+  }
+
 
   exec.cancel();
   if (spin_thread.joinable()) spin_thread.join();
