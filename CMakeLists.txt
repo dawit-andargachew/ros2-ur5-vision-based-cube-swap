@@ -7,19 +7,43 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-# uncomment the following section in order to fill in
-# further dependencies manually.
-# find_package(<dependency> REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_action REQUIRED)
 find_package(moveit_ros_planning_interface REQUIRED)
 find_package(moveit_core REQUIRED)
 find_package(moveit_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(shape_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
-find_package(shape_msgs REQUIRED)
-find_package(rclcpp_action REQUIRED)
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "action/Pick.action"
+  "action/Place.action"
+  "srv/GetCubePoses.srv"
+  DEPENDENCIES geometry_msgs
+)
+
+rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+# Add the motion_util library
+add_library(motion_util_lib STATIC src/motion_util.cpp)
+ament_target_dependencies(motion_util_lib
+  rclcpp
+  moveit_ros_planning_interface
+  moveit_core
+  moveit_msgs
+  geometry_msgs
+  shape_msgs
+)
+
+# Set include directories for the library
+target_include_directories(motion_util_lib PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
 # find_package(ament_cmake_python REQUIRED)
 # Create executable 'pick_action_server' from 'src/PickActionServer.cpp'
 add_executable(pick_action_server src/PickActionServer.cpp)
@@ -54,37 +78,15 @@ ament_target_dependencies(place_action_client
   rclcpp_action
 )
 
-
-# Add the motion_util library
-add_library(motion_util_lib STATIC src/motion_util.cpp)
-ament_target_dependencies(motion_util_lib
-  rclcpp
-  moveit_ros_planning_interface
-  moveit_core
-  moveit_msgs
-  geometry_msgs
-  shape_msgs
-)
-
-# Set include directories for the library
-target_include_directories(motion_util_lib PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>
-)
-
 # Link the library to the pick executable
 target_link_libraries(pick_action_server motion_util_lib)
 target_link_libraries(place_action_server motion_util_lib)
 
-rosidl_generate_interfaces(${PROJECT_NAME}
-  "action/Pick.action"
-  "action/Place.action"
-  "srv/GetCubePoses.srv"
-  DEPENDENCIES geometry_msgs
-)
 
 add_dependencies(pick_action_server ${PROJECT_NAME})
 add_dependencies(pick_action_client ${PROJECT_NAME})
+add_dependencies(place_action_server ${PROJECT_NAME})
+add_dependencies(place_action_client ${PROJECT_NAME})
 
 target_link_libraries(pick_action_server ${cpp_typesupport_target})
 target_link_libraries(pick_action_client ${cpp_typesupport_target})
@@ -133,8 +135,6 @@ add_dependencies(cube_detector ${PROJECT_NAME})
 
 rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
-target_link_libraries(pick_action_server ${cpp_typesupport_target})
-target_link_libraries(pick_action_client ${cpp_typesupport_target})
 target_link_libraries(cube_detector ${cpp_typesupport_target})
 
 install(TARGETS 
