@@ -75,9 +75,9 @@ private:
   static constexpr double kClosedVal = 0.8;
 
   // --- HEIGHT & SIDE ADJUSTMENTS ---
-  static constexpr double kGripperLengthOffset = 0.05;
+  static constexpr double kGripperLengthOffset = 0.05; // 0.12, 0.14, 0.15 dones't all work
   static constexpr double kLateralOffset = 0.01;
-  static constexpr double kGraspCenterZOffset = 0.05; 
+  static constexpr double kGraspCenterZOffset = 0.04; /// 0.01, -0.01
   static constexpr double kPreGraspApproachDist = 0.15;
 
   // =========================
@@ -179,9 +179,10 @@ private:
 
     cube_pose_ = geometry_msgs::msg::Pose{};
     constexpr double kOffsetYLateral = 0.01;
-    cube_pose_.position.x = 3.97;
+    constexpr double KoffSetXLateral = 0.03 
+    cube_pose_.position.x = 3.97 + KoffSetXLateral;
     cube_pose_.position.y = -1.10 + kOffsetYLateral;
-    cube_pose_.position.z = 0.4;
+    cube_pose_.position.z = 0.38;
     cube_pose_.orientation.w = 1.0;
 
     cube.primitives.push_back(cube_prim);
