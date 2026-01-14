@@ -75,16 +75,10 @@ private:
   static constexpr double kClosedVal = 0.8;  // Changed to 0.8 to ensure tight grip (0.1 might be too loose)
 
   // --- HEIGHT ADJUSTMENT (UP/DOWN) ---
-  // 0.30 meters from cube center to wrist. 
-  // If gripper hits the cube, INCREASE this (e.g., 0.32).
-  // If gripper grasps air above cube, DECREASE this (e.g., 0.28).
   static constexpr double kGripperLengthOffset = 0.05; // it was 0.30 before 
   
-  // --- SIDE ADJUSTMENT (LEFT/RIGHT) ---
-  // Positive = Left (in standard UR frame)
-  // Negative = Right
-  // 0.02 = 2cm Left. Adjust this if it's not centered!
-  static constexpr double kLateralOffset = 0.015;  // it was 0.02 before
+  // --- SIDE ADJUSTMENT (LEFT/RIGHT) --- even minor changes make it worse
+  static constexpr double kLateralOffset = 0.01;  // it was 0.02 before
 
   static constexpr double kGraspCenterZOffset = 0.05; 
   static constexpr double kPreGraspApproachDist = 0.15;
@@ -150,8 +144,14 @@ private:
     cube_prim.dimensions = {0.06, 0.06, 0.1};
 
     cube_pose_ = geometry_msgs::msg::Pose{};
+
+    constexpr double kOffsetYLateral = 0.01;
+    // negavtives like -0.08,  doesnt' work
+    // 0.02
+
+
     cube_pose_.position.x = 3.97;
-    cube_pose_.position.y = -1.10;
+    cube_pose_.position.y = -1.10 + kOffsetYLateral;
     cube_pose_.position.z = 0.4;
     cube_pose_.orientation.w = 1.0;
 
@@ -171,12 +171,8 @@ private:
   {
     RCLCPP_INFO(get_logger(), "Moving to 'Elbow Up' Ready Pose...");
     std::map<std::string, double> target_joints;
-    target_joints["shoulder_pan_joint"] = -1.73; // -1.64;
-    target_joints["shoulder_lift_joint"] = -1.46; 
-    target_joints["elbow_joint"]         =  0.85; //1.12; 
-    target_joints["wrist_1_joint"]       = -1.48;
-    target_joints["wrist_2_joint"]       = -1.37;
-    target_joints["wrist_3_joint"]       = -0.38;
+    target_joints["shoulder_pan_joint"] = -1.70; // -1.64;
+    target_joints["shoulder_lift_joint"] = -1.46;
    
     arm_group_.setJointValueTarget(target_joints);
     arm_group_.setMaxVelocityScalingFactor(0.5);
