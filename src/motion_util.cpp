@@ -8,18 +8,46 @@ using namespace std::chrono_literals;
 
 namespace motion_util {
 
-    void configure_moveit(moveit::planning_interface::MoveGroupInterface& arm_mgi,
-                         moveit::planning_interface::MoveGroupInterface& gripper_mgi) {
-        arm_mgi.setMaxVelocityScalingFactor(0.5);  // Fixed: was arm_mgi_ (typo)
-        arm_mgi.setMaxAccelerationScalingFactor(0.5);
-        arm_mgi.setPlanningTime(20.0);
+    // void configure_moveit(moveit::planning_interface::MoveGroupInterface& arm_mgi,
+    //                      moveit::planning_interface::MoveGroupInterface& gripper_mgi) {
+    //     arm_mgi.setMaxVelocityScalingFactor(0.5);  // Fixed: was arm_mgi_ (typo)
+    //     arm_mgi.setMaxAccelerationScalingFactor(0.5);
+    //     arm_mgi.setPlanningTime(20.0);
 
-        // (void)arm_mgi.getCurrentState(2.0);  // Added: matches MotionInterface.cpp
-        // (void)gripper_mgi.getCurrentState(2.0);  // Added: matches MotionInterface.cpp
-    }
+    //     // (void)arm_mgi.getCurrentState(2.0);  // Added: matches MotionInterface.cpp
+    //     // (void)gripper_mgi.getCurrentState(2.0);  // Added: matches MotionInterface.cpp
+    // }
 
     // In motion_util.cpp, update configure_moveit function:
-
+    void configure_moveit(moveit::planning_interface::MoveGroupInterface& arm_mgi,
+                     moveit::planning_interface::MoveGroupInterface& gripper_mgi) {
+    // More conservative velocity and acceleration for stability
+    arm_mgi.setMaxVelocityScalingFactor(0.3);
+    arm_mgi.setMaxAccelerationScalingFactor(0.3);
+    
+    // Increase planning time to allow more attempts
+    arm_mgi.setPlanningTime(30.0);
+    
+    // Set number of planning attempts
+    arm_mgi.setNumPlanningAttempts(10);
+    
+    // Set goal tolerance (helps with hard-to-reach poses)
+    arm_mgi.setGoalPositionTolerance(0.01);  // 1cm position tolerance
+    arm_mgi.setGoalOrientationTolerance(0.05);  // ~3 degree orientation tolerance
+    arm_mgi.setGoalJointTolerance(0.01);  // Joint tolerance in radians
+    
+    // Allow replanning during execution if needed
+    arm_mgi.allowReplanning(true);
+    
+    // Set specific planner (RRTConnect is generally robust)
+    arm_mgi.setPlannerId("RRTConnectkConfigDefault");
+    
+    // Configure gripper as well
+    gripper_mgi.setMaxVelocityScalingFactor(0.5);
+    gripper_mgi.setMaxAccelerationScalingFactor(0.5);
+    gripper_mgi.setPlanningTime(10.0);
+    gripper_mgi.setNumPlanningAttempts(5);
+}
 
 
     void apply_path_constraints(moveit::planning_interface::MoveGroupInterface& arm_group_, const rclcpp::Logger& logger)
@@ -101,6 +129,11 @@ namespace motion_util {
         obj.pose = new_pose;
 
         planning_scene_.applyCollisionObject(obj);
+    }
+
+    std::vector<std::string> getSceneObjectNames(moveit::planning_interface::PlanningSceneInterface& planning_scene_)
+    {
+        return planning_scene_.getKnownObjectNames();
     }
 
     bool setGripper(double joint_value, moveit::planning_interface::MoveGroupInterface& gripper_mgi, const rclcpp::Logger& logger)

@@ -10,13 +10,24 @@ pick_action_server:
     scene.cube.base_z: 0.4
     scene.cube.offset_x: 0.035
 
+    # Cube and AprilTag physical dimensions (meters)
+    dimensions.apriltag_size: 0.050        # AprilTag is 0.050x0.050m
+    dimensions.cube_width: 0.06            # Cube width (X)
+    dimensions.cube_depth: 0.06            # Cube depth (Y)
+    dimensions.cube_height: 0.1            # Cube height (Z)
+
+    # AprilTag to cube center transformation
+    # AprilTag pose is at cube center but needs lateral correction
+    apriltag.tag_to_cube_center_offset: 0.00  # Not used - tag is already at center
+    apriltag.lateral_x_offset: 0.035          # Lateral X correction (trial and error)
+
     # Side grasp orientation (RPY, radians)
     # Absolute orientation for Y-axis side approach
     grasp.rpy.roll: 1.5707    # 90 deg roll to orient gripper for side grasp
     grasp.rpy.pitch: 0.0      # Horizontal approach
     grasp.rpy.yaw: 0.0        # No yaw rotation
     # Grasp positioning offsets (meters)
-    grasp.center_z_offset: -0.02
+    grasp.center_z_offset: -0.05
     grasp.tool_length_offset: 0.18  # Y offset from cube center
 
     # Motion distances (meters)

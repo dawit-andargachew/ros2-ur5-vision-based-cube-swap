@@ -1,5 +1,5 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription
 from launch.launch_description_sources import AnyLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 
@@ -18,12 +18,21 @@ def generate_launch_description():
 		"ir_gripper", package_name=moveit_config_pkg
 	).to_moveit_configs()
 
-	apriltag_wrapper = IncludeLaunchDescription(
-		AnyLaunchDescriptionSource(
-			PathJoinSubstitution(
-				[FindPackageShare("group_6_assignment_2"), "launch", "apriltag_wrapper.launch.yml"]
-			)
-		)
+	# apriltag_wrapper = IncludeLaunchDescription(
+	# 	AnyLaunchDescriptionSource(
+	# 		PathJoinSubstitution(
+	# 			[FindPackageShare("group_6_assignment_2"), "launch", "apriltag_wrapper.launch.yml"]
+	# 		)
+	# 		output='log',
+	# 		emulate_tty=False
+	# 	)
+	# )
+
+	# 2. Launch apriltag detection node (silenced in terminal)
+	apriltag_launch = ExecuteProcess(
+		cmd=['ros2', 'launch','group_6_assignment_2', 'apriltag_wrapper.launch.yml'],
+		output='log',
+		emulate_tty=False
 	)
 
 	cube_detector_node = Node(
@@ -57,7 +66,7 @@ def generate_launch_description():
 				default_value="true",
 				description="Use simulation clock if true",
 			),
-			apriltag_wrapper,
+			apriltag_launch,
 			cube_detector_node,
 			pick_action_server_node,
 		]

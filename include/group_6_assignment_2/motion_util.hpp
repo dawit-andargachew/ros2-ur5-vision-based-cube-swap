@@ -24,6 +24,8 @@ namespace motion_util {
                             const std::string& frame_id,
                             moveit::planning_interface::PlanningSceneInterface& planning_scene_);
 
+    std::vector<std::string> getSceneObjectNames(moveit::planning_interface::PlanningSceneInterface& planning_scene_);
+
     bool setGripper(double joint_value, moveit::planning_interface::MoveGroupInterface& gripper_mgi, const rclcpp::Logger& logger);
 
     bool execute_move(const std::string& name,

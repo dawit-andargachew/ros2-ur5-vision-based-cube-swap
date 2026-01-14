@@ -22,6 +22,7 @@
 
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "group_6_assignment_2/action/pick.hpp"
+#include "group_6_assignment_2/srv/get_cube_poses.hpp"
 
 using namespace std::chrono_literals;
 using namespace motion_util;
@@ -54,6 +55,9 @@ public:
     configure_moveit(arm_group_, gripper_group_);  // Updated: Use motion_util::configure_moveit
     //apply_path_constraints(arm_group_, get_logger());  // ADDED: Apply path constraints
 
+    // Create service client for cube pose detection
+    cube_pose_client_ = this->create_client<group_6_assignment_2::srv::GetCubePoses>("get_cube_poses");
+
     declare_and_get_parameters();
   }
 
@@ -76,15 +80,46 @@ public:
     //we check cancelling after each major step of the pipeline
     if (goal_handle->is_canceling()) return false;
 
+    // Sense cube position FIRST (before moving, to get latest position)
+    feedback->status = "Sensing cube position";
+    goal_handle->publish_feedback(feedback);
+    if (!sense_cube(cube_id)) return false;
+    if (goal_handle->is_canceling()) return false;
+
+    // Move to home position (safe position before cleanup)
+    feedback->status = "Moving to home position";
+    goal_handle->publish_feedback(feedback);
+    if (!move_to_home()) return false;
+    if (goal_handle->is_canceling()) return false;
+
+    // Clean up scene state from any previous attempts (at home position, safe to detach)
+    feedback->status = "Cleaning up scene state";
+    goal_handle->publish_feedback(feedback);
+    if (!cleanup_scene()) return false;
+    if (goal_handle->is_canceling()) return false;
+
     feedback->status = "Setting up planning scene";
     goal_handle->publish_feedback(feedback);
     if (!setup_scene()) return false;
-    
     if (goal_handle->is_canceling()) return false;
-   
     
-    // Give time for planning scene to update
-    rclcpp::sleep_for(2s);
+    //go to active position
+    feedback->status = "Moving to active position";
+    goal_handle->publish_feedback(feedback);
+    if (!move_to_active()) return false;
+    if (goal_handle->is_canceling()) return false;
+    
+    //we check cancelling after each major step of the pipeline
+    if (goal_handle->is_canceling()) return false;
+
+    // Wait for planning scene to update with collision objects
+    feedback->status = "Waiting for scene synchronization";
+    goal_handle->publish_feedback(feedback);
+    std::vector<std::string> expected_objects = {kTableId, kCubeId};
+    if (!wait_for_scene_update(expected_objects)) {
+      RCLCPP_ERROR(get_logger(), "Planning scene did not update in time");
+      return false;
+    }
 
     feedback->status = "Moving to pre-grasp position";
     goal_handle->publish_feedback(feedback);
@@ -125,6 +160,8 @@ public:
 private:
 
   rclcpp_action::Server<Pick>::SharedPtr action_server_;
+  rclcpp::Client<group_6_assignment_2::srv::GetCubePoses>::SharedPtr cube_pose_client_;
+  
   // =========================
   // Members (own the state)
   // =========================
@@ -165,6 +202,15 @@ private:
     double cube_base_z = 0.4;
     double cube_offset_x = 0.035;
 
+    // Cube and AprilTag dimensions
+    double apriltag_size = 0.050;  // AprilTag is 0.050x0.050m
+    double cube_width = 0.06;      // Cube is 0.06x0.06x0.1m
+    double cube_depth = 0.06;
+    double cube_height = 0.1;
+    // Offset from AprilTag center to cube center (tag is on one face)
+    double tag_to_cube_center_offset = 0.03;  // Half of cube depth (0.06/2)
+    double lateral_x_offset = 0.035;          // Lateral X correction
+
     // Grasp
     double grasp_roll = 0.0;
     double grasp_pitch = -1.5707;
@@ -193,6 +239,14 @@ private:
     this->declare_parameter<double>("scene.cube.base_z", params_.cube_base_z);
     this->declare_parameter<double>("scene.cube.offset_x", params_.cube_offset_x);
 
+    // Cube and AprilTag dimensions
+    this->declare_parameter<double>("dimensions.apriltag_size", params_.apriltag_size);
+    this->declare_parameter<double>("dimensions.cube_width", params_.cube_width);
+    this->declare_parameter<double>("dimensions.cube_depth", params_.cube_depth);
+    this->declare_parameter<double>("dimensions.cube_height", params_.cube_height);
+    this->declare_parameter<double>("apriltag.tag_to_cube_center_offset", params_.tag_to_cube_center_offset);
+    this->declare_parameter<double>("apriltag.lateral_x_offset", params_.lateral_x_offset);
+
     // Grasp
     this->declare_parameter<double>("grasp.rpy.roll", params_.grasp_roll);
     this->declare_parameter<double>("grasp.rpy.pitch", params_.grasp_pitch);
@@ -217,6 +271,13 @@ private:
     this->get_parameter("scene.cube.base_y", params_.cube_base_y);
     this->get_parameter("scene.cube.base_z", params_.cube_base_z);
     this->get_parameter("scene.cube.offset_x", params_.cube_offset_x);
+
+    this->get_parameter("dimensions.apriltag_size", params_.apriltag_size);
+    this->get_parameter("dimensions.cube_width", params_.cube_width);
+    this->get_parameter("dimensions.cube_depth", params_.cube_depth);
+    this->get_parameter("dimensions.cube_height", params_.cube_height);
+    this->get_parameter("apriltag.tag_to_cube_center_offset", params_.tag_to_cube_center_offset);
+    this->get_parameter("apriltag.lateral_x_offset", params_.lateral_x_offset);
 
     this->get_parameter("grasp.rpy.roll", params_.grasp_roll);
     this->get_parameter("grasp.rpy.pitch", params_.grasp_pitch);
@@ -285,6 +346,63 @@ private:
 
 private:
 
+  bool sense_cube(uint8_t cube_id)
+  {
+    // Wait for service to be available
+    if (!cube_pose_client_->wait_for_service(5s)) {
+      RCLCPP_ERROR(get_logger(), "GetCubePoses service not available after waiting");
+      return false;
+    }
+
+    // Create request
+    auto request = std::make_shared<group_6_assignment_2::srv::GetCubePoses::Request>();
+    request->target_ids.push_back(static_cast<int32_t>(cube_id));
+
+    // Call service asynchronously and wait without spinning (node is already spinning in main thread)
+    auto future = cube_pose_client_->async_send_request(request);
+    
+    // Wait for response with timeout (don't spin - main thread is already spinning)
+    auto status = future.wait_for(10s);
+    if (status != std::future_status::ready) {
+      RCLCPP_ERROR(get_logger(), "GetCubePoses service call timed out");
+      return false;
+    }
+
+    auto response = future.get();
+    if (!response->success || response->detected_ids.empty()) {
+      RCLCPP_ERROR(get_logger(), "Cube ID %d not detected: %s", cube_id, response->message.c_str());
+      return false;
+    }
+
+    // Store the detected AprilTag pose
+    geometry_msgs::msg::Pose apriltag_pose = response->poses[0];
+    RCLCPP_INFO(get_logger(), "Sensed AprilTag %d at: x=%.3f, y=%.3f, z=%.3f",
+                cube_id, apriltag_pose.position.x, apriltag_pose.position.y, apriltag_pose.position.z);
+    
+    // Transform AprilTag pose to cube center pose
+    // AprilTag is mounted on one face of the cube, need to offset to cube center
+    cube_pose_ = transform_apriltag_to_cube_center(apriltag_pose);
+    
+    RCLCPP_INFO(get_logger(), "Transformed to cube center at: x=%.3f, y=%.3f, z=%.3f",
+                cube_pose_.position.x, cube_pose_.position.y, cube_pose_.position.z);
+    
+    return true;
+  }
+
+  geometry_msgs::msg::Pose transform_apriltag_to_cube_center(const geometry_msgs::msg::Pose& apriltag_pose) const
+  {
+    // AprilTag pose is already at cube center, but needs lateral X correction
+    geometry_msgs::msg::Pose cube_center_pose = apriltag_pose;
+    
+    // Apply lateral X offset (empirical correction from trial and error)
+    cube_center_pose.position.x = apriltag_pose.position.x + params_.lateral_x_offset;
+    
+    // Orientation remains the same as the AprilTag
+    cube_center_pose.orientation = apriltag_pose.orientation;
+    
+    return cube_center_pose;
+  }
+
   bool wait_for_robot_state()
   {
     int attempts = 0;
@@ -306,14 +424,153 @@ private:
     return false;
   }
 
-  bool setup_scene()
+  bool verify_detached(const std::string& object_id, int max_attempts = 10)
   {
-    // Updated: Call motion_util::setup_scene to add collision objects
-    if (!motion_util::setup_scene(planning_scene_)) {
-      return false;
+    RCLCPP_INFO(get_logger(), "Verifying '%s' is detached from planning scene...", object_id.c_str());
+    for (int i = 0; i < max_attempts; ++i) {
+      auto attached_objects = planning_scene_.getAttachedObjects();
+      if (attached_objects.find(object_id) == attached_objects.end()) {
+        RCLCPP_INFO(get_logger(), "Confirmed: '%s' is detached", object_id.c_str());
+        return true;
+      }
+      RCLCPP_WARN(get_logger(), "Waiting for '%s' to detach (attempt %d/%d)...", object_id.c_str(), i + 1, max_attempts);
+      rclcpp::sleep_for(200ms);
+    }
+    RCLCPP_ERROR(get_logger(), "Scene still shows '%s' as attached after %d attempts", object_id.c_str(), max_attempts);
+    return false;
+  }
+
+  bool wait_for_scene_update(const std::vector<std::string>& expected_objects, int max_attempts = 20)
+  {
+    RCLCPP_INFO(get_logger(), "Waiting for planning scene to update with collision objects...");
+    for (int i = 0; i < max_attempts; ++i) {
+      auto known_objects = planning_scene_.getKnownObjectNames();
+      bool all_present = true;
+      for (const auto& obj : expected_objects) {
+        if (std::find(known_objects.begin(), known_objects.end(), obj) == known_objects.end()) {
+          all_present = false;
+          break;
+        }
+      }
+      if (all_present) {
+        RCLCPP_INFO(get_logger(), "Planning scene updated successfully");
+        return true;
+      }
+      rclcpp::sleep_for(200ms);
+    }
+    RCLCPP_ERROR(get_logger(), "Planning scene did not update after %d attempts", max_attempts);
+    return false;
+  }
+
+  bool move_to_active() {
+    RCLCPP_INFO(get_logger(), "Moving to active position...");
+
+    // Hardcoded active joint configuration (in radians)
+    std::map<std::string, double> active_joints;
+    // 171° (No change needed, within +/- 180)
+    active_joints["shoulder_pan_joint"] = 2.98;
+    active_joints["shoulder_lift_joint"] = -2.39; 
+    active_joints["elbow_joint"] = 1.87;
+    active_joints["wrist_1_joint"] = 0.66;
+    active_joints["wrist_2_joint"] = -0.33;
+    active_joints["wrist_3_joint"] = 2.98;
+
+    arm_group_.setJointValueTarget(active_joints);
+
+    // Try direct move (bypasses explicit planning)
+    auto result = arm_group_.move();
+    if (result != moveit::core::MoveItErrorCode::SUCCESS) {
+        RCLCPP_ERROR(get_logger(), "Direct move to active position failed");
+        return false;
     }
 
-    // Override default scene object poses using parameters so collision + grasp stay consistent.
+    RCLCPP_INFO(get_logger(), "Successfully moved to active position");
+    return true;
+  }
+
+  bool move_to_home()
+  {
+    RCLCPP_INFO(get_logger(), "Moving to home position...");
+    
+    // Hardcoded home joint configuration (in radians)
+    std::map<std::string, double> home_joints;
+    home_joints["shoulder_pan_joint"] = 0.0;           // -0°
+    home_joints["shoulder_lift_joint"] = -1.5708;      // -90°
+    home_joints["elbow_joint"] = 0.0;                  // 0°
+    home_joints["wrist_1_joint"] = -1.5708;            // -90°
+    home_joints["wrist_2_joint"] = 0.0;                // 0°
+    home_joints["wrist_3_joint"] = 0.0;                // -0°
+    
+    arm_group_.setJointValueTarget(home_joints);
+    
+    // Try direct move (bypasses explicit planning)
+    auto result = arm_group_.move();
+    if (result != moveit::core::MoveItErrorCode::SUCCESS) {
+      RCLCPP_ERROR(get_logger(), "Direct move to home position failed");
+      return false;
+    }
+    
+    RCLCPP_INFO(get_logger(), "Successfully moved to home position");
+    return true;
+  }
+
+  bool cleanup_scene()
+  {
+    RCLCPP_INFO(get_logger(), "Cleaning up scene state from previous attempts...");
+    
+    // Check if the target cube is attached from a previous attempt
+    auto attached_objects = planning_scene_.getAttachedObjects();
+    if (attached_objects.find(kCubeId) != attached_objects.end()) {
+      RCLCPP_WARN(get_logger(), "Cube '%s' is attached from previous attempt, detaching...", kCubeId);
+      if (!motion_util::detachObject(kCubeId, arm_group_, get_logger())) {
+        RCLCPP_ERROR(get_logger(), "Failed to detach cube during cleanup");
+        return false;
+      }
+      // Verify planning scene updated (scene synchronization)
+      if (!verify_detached(kCubeId)) {
+        RCLCPP_ERROR(get_logger(), "Planning scene still shows cube as attached after detach");
+        return false;
+      }
+    }
+    
+    // Ensure gripper is open (in case it was closed from previous attempt)
+    RCLCPP_INFO(get_logger(), "Ensuring gripper is open...");
+    if (!open_gripper()) {
+      RCLCPP_ERROR(get_logger(), "Failed to open gripper during cleanup");
+      return false;
+    }
+    
+    RCLCPP_INFO(get_logger(), "Scene cleanup complete");
+    return true;
+  }
+
+  bool setup_scene()
+  {
+    // Defensive check: ensure cube is detached before updating scene
+    // (should have been done in cleanup_scene, but double-check for safety)
+    auto attached_objects = planning_scene_.getAttachedObjects();
+    if (attached_objects.find(kCubeId) != attached_objects.end()) {
+      RCLCPP_WARN(get_logger(), "Cube '%s' still attached, detaching before scene update...", kCubeId);
+      motion_util::detachObject(kCubeId, arm_group_, get_logger());
+      rclcpp::sleep_for(500ms);
+    }
+    
+    // Check if scene objects already exist (for repeated calls)
+    auto existing_objects = planning_scene_.getKnownObjectNames();
+    bool table_exists = std::find(existing_objects.begin(), existing_objects.end(), kTableId) != existing_objects.end();
+    bool cube_exists = std::find(existing_objects.begin(), existing_objects.end(), kCubeId) != existing_objects.end();
+
+    if (!table_exists || !cube_exists) {
+      // First time: add collision objects to scene
+      if (!motion_util::setup_scene(planning_scene_)) {
+        return false;
+      }
+      RCLCPP_INFO(get_logger(), "Initial scene setup completed");
+    } else {
+      RCLCPP_INFO(get_logger(), "Scene objects already exist, updating poses");
+    }
+
+    // Update table pose from parameters
     geometry_msgs::msg::Pose table_pose;
     table_pose.position.x = params_.table_x;
     table_pose.position.y = params_.table_y;
@@ -321,11 +578,7 @@ private:
     table_pose.orientation.w = 1.0;
     motion_util::moveCollisionObject(kTableId, table_pose, kWorldFrame, planning_scene_);
 
-    cube_pose_ = geometry_msgs::msg::Pose{};
-    cube_pose_.position.x = params_.cube_base_x + params_.cube_offset_x;
-    cube_pose_.position.y = params_.cube_base_y;
-    cube_pose_.position.z = params_.cube_base_z;
-    cube_pose_.orientation.w = 1.0;
+    // Update cube pose using sensed position (cube_pose_ is set by sense_cube())
     motion_util::moveCollisionObject(kCubeId, cube_pose_, kWorldFrame, planning_scene_);
 
     // Precompute grasp pose to keep locality: used by pre-grasp/grasp/lift)
