@@ -52,17 +52,43 @@ namespace motion_util {
 
     void apply_path_constraints(moveit::planning_interface::MoveGroupInterface& arm_group_, const rclcpp::Logger& logger)
     {
-        moveit_msgs::msg::Constraints path_constraints;
-        moveit_msgs::msg::JointConstraint lift_constraint;
+        // moveit_msgs::msg::Constraints path_constraints;
+        // moveit_msgs::msg::JointConstraint lift_constraint;
 
+        // lift_constraint.joint_name = "shoulder_lift_joint";
+        // lift_constraint.position = -1.57;
+        // lift_constraint.tolerance_above = 1.0;
+        // lift_constraint.tolerance_below = 1.5;
+        // lift_constraint.weight = 1.0;
+
+        // path_constraints.joint_constraints.push_back(lift_constraint);
+        // arm_group_.setPathConstraints(path_constraints);
+
+        // RCLCPP_INFO(logger, "Elbow-up joint constraint applied.");
+
+        moveit_msgs::msg::Constraints path_constraints;
+        path_constraints.name = "elbow_up_constraint";
+
+        moveit_msgs::msg::JointConstraint lift_constraint;
         lift_constraint.joint_name = "shoulder_lift_joint";
-        lift_constraint.position = -1.57;
-        lift_constraint.tolerance_above = 1.0;
-        lift_constraint.tolerance_below = 1.5;
+        
+        // Target position (Elbow Up)
+        lift_constraint.position = -1.50; 
+        
+        // Tolerances
+        lift_constraint.tolerance_above = 1.5; 
+        lift_constraint.tolerance_below = 1.0; 
+        
+        // Weight
         lift_constraint.weight = 1.0;
 
         path_constraints.joint_constraints.push_back(lift_constraint);
+
+        // Apply to the group
         arm_group_.setPathConstraints(path_constraints);
+        
+        // Optional: Loosen goal tolerance slightly to help planner succeed with constraints
+        arm_group_.setGoalJointTolerance(0.01); 
 
         RCLCPP_INFO(logger, "Elbow-up joint constraint applied.");
     }

@@ -160,7 +160,7 @@ public:
 
     feedback->status = "Lifting object";
     goal_handle->publish_feedback(feedback);
-    if (!lift_up_non_cartesian()) return false;
+    if (!lift_up_cartesian()) return false;
     if (goal_handle->is_canceling()) return false;
 
     feedback->status = "Pick sequence complete";
