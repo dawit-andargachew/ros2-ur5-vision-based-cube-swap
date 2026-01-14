@@ -18,36 +18,33 @@ namespace motion_util {
     //     // (void)gripper_mgi.getCurrentState(2.0);  // Added: matches MotionInterface.cpp
     // }
 
-    // In motion_util.cpp, update configure_moveit function:
+    // In motion_util.cpp, update configure_moveit:
     void configure_moveit(moveit::planning_interface::MoveGroupInterface& arm_mgi,
-                     moveit::planning_interface::MoveGroupInterface& gripper_mgi) {
-    // More conservative velocity and acceleration for stability
-    arm_mgi.setMaxVelocityScalingFactor(0.3);
-    arm_mgi.setMaxAccelerationScalingFactor(0.3);
-    
-    // Increase planning time to allow more attempts
-    arm_mgi.setPlanningTime(20.0);
-    
-    // Set number of planning attempts
-    arm_mgi.setNumPlanningAttempts(30);
-    
-    // Set goal tolerance (helps with hard-to-reach poses)
-    arm_mgi.setGoalPositionTolerance(0.01);  // 1cm position tolerance
-    arm_mgi.setGoalOrientationTolerance(0.05);  // ~3 degree orientation tolerance
-    arm_mgi.setGoalJointTolerance(0.01);  // Joint tolerance in radians
-    
-    // Allow replanning during execution if needed
-    arm_mgi.allowReplanning(true);
-    
-    // // Set specific planner (RRTConnect is generally robust)
-    // arm_mgi.setPlannerId("RRTConnectkConfigDefault");
-    
-    // Configure gripper as well
-    gripper_mgi.setMaxVelocityScalingFactor(0.5);
-    gripper_mgi.setMaxAccelerationScalingFactor(0.5);
-    gripper_mgi.setPlanningTime(10.0);
-    gripper_mgi.setNumPlanningAttempts(5);
-}
+                        moveit::planning_interface::MoveGroupInterface& gripper_mgi) {
+        // More balanced settings
+        arm_mgi.setMaxVelocityScalingFactor(0.5);  // Increased from 0.3
+        arm_mgi.setMaxAccelerationScalingFactor(0.4);
+        arm_mgi.setPlanningTime(10.0);  // Reduced from 20.0
+        arm_mgi.setNumPlanningAttempts(10);  // Reduced from 50
+        
+        // Use relaxed tolerances
+        arm_mgi.setGoalPositionTolerance(0.015);  // 1.5cm
+        arm_mgi.setGoalOrientationTolerance(0.1);  // ~5.7 degrees
+        arm_mgi.setGoalJointTolerance(0.02);
+        
+        // // Set a robust planner
+        // arm_mgi.setPlannerId("RRTConnect");
+        
+        // For Cartesian paths, use:
+        arm_mgi.setMaxVelocityScalingFactor(0.3);  // Slower for precision
+        arm_mgi.setPlanningTime(15.0);  // Longer for Cartesian
+        
+        // Gripper settings
+        gripper_mgi.setMaxVelocityScalingFactor(0.8);
+        gripper_mgi.setMaxAccelerationScalingFactor(0.8);
+        gripper_mgi.setPlanningTime(5.0);
+        gripper_mgi.setNumPlanningAttempts(3);
+    }
 
 
     void apply_path_constraints(moveit::planning_interface::MoveGroupInterface& arm_group_, const rclcpp::Logger& logger)
@@ -160,25 +157,57 @@ namespace motion_util {
         return result == moveit::core::MoveItErrorCode::SUCCESS;
     }
 
+    // In motion_util.cpp, update executeCartesianPath:
     bool executeCartesianPath(const std::vector<geometry_msgs::msg::Pose>& waypoints,
-                          double eef_step,
-                          double min_fraction,
-                          moveit::planning_interface::MoveGroupInterface& arm_mgi_,
-                          const rclcpp::Logger& logger
-                      )
-    {
-        moveit_msgs::msg::RobotTrajectory traj;
-        const double jump_thresh = 0.0;
-        const double fraction = arm_mgi_.computeCartesianPath(waypoints, eef_step, jump_thresh, traj);
-
-        RCLCPP_INFO(logger, "Computed Cartesian path fraction: %.1f%%", fraction * 100.0);  // Fixed: was node_->get_logger()
-
-        if (fraction < min_fraction) {
-            RCLCPP_ERROR(logger, "Cartesian path failed (only %.1f%% computed).", fraction * 100.0);  // Fixed: was logger (already correct, but ensuring consistency)
+                            double eef_step,
+                            double min_fraction,
+                            moveit::planning_interface::MoveGroupInterface& arm_mgi_,
+                            const rclcpp::Logger& logger) {
+        
+        // Temporary relaxation of constraints for Cartesian motion
+        moveit_msgs::msg::Constraints original_constraints = arm_mgi_.getPathConstraints();
+        arm_mgi_.clearPathConstraints();
+        
+        // Try multiple times with different step sizes
+        std::vector<double> step_sizes = {0.05, 0.03, 0.01};  // Try coarse first
+        double best_fraction = 0.0;
+        moveit_msgs::msg::RobotTrajectory best_traj;
+        
+        for (double step : step_sizes) {
+            moveit_msgs::msg::RobotTrajectory traj;
+            const double jump_thresh = 0.0;
+            const double fraction = arm_mgi_.computeCartesianPath(waypoints, step, jump_thresh, traj);
+            
+            RCLCPP_INFO(logger, "Cartesian path with step %.3f: %.1f%% computed", 
+                    step, fraction * 100.0);
+            
+            if (fraction > best_fraction) {
+                best_fraction = fraction;
+                best_traj = traj;
+            }
+            
+            if (fraction >= min_fraction) break;
+        }
+        
+        // Restore constraints
+        if (!original_constraints.joint_constraints.empty()) {
+            arm_mgi_.setPathConstraints(original_constraints);
+        }
+        
+        if (best_fraction < min_fraction) {
+            RCLCPP_WARN(logger, "Best Cartesian path only %.1f%% (required %.1f%%)", 
+                    best_fraction * 100.0, min_fraction * 100.0);
+            // Try with lower requirement
+            if (best_fraction > 0.5) {  // If we got more than 50%, try executing
+                RCLCPP_INFO(logger, "Attempting to execute partial path (%.1f%%)", 
+                        best_fraction * 100.0);
+                return execute_trajectory("Execute partial Cartesian path", 
+                                        arm_mgi_, best_traj, logger);
+            }
             return false;
         }
-
-        return execute_trajectory("Execute Cartesian path", arm_mgi_, traj, logger);
+        
+        return execute_trajectory("Execute Cartesian path", arm_mgi_, best_traj, logger);
     }
 
     bool plan_and_execute_to_pose(const geometry_msgs::msg::Pose& pose,
