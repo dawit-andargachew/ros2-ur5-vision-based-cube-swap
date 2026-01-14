@@ -36,7 +36,7 @@ public:
     if (!setup_scene()) return false;
 
     // 2. Move to "Ready Pose" (High Elbow)
-    if (!move_to_ready_pose()) return false;
+    // if (!move_to_ready_pose()) return false;
 
     // 3. Move to "Pre-Grasp" (Hover above cube)
     if (!move_to_pre_grasp()) return false;
@@ -75,9 +75,9 @@ private:
   static constexpr double kClosedVal = 0.8;
 
   // --- HEIGHT & SIDE ADJUSTMENTS ---
-  static constexpr double kGripperLengthOffset = 0.05; // 0.12, 0.14, 0.15 dones't all work
+  static constexpr double kGripperLengthOffset = 0.10; // 0.02 and 0.10 lower values like 0.02 seems workig for this case
   static constexpr double kLateralOffset = 0.01;
-  static constexpr double kGraspCenterZOffset = 0.04; /// 0.01, -0.01
+  static constexpr double kGraspCenterZOffset = 0.04; ///
   static constexpr double kPreGraspApproachDist = 0.15;
 
   // =========================
@@ -179,7 +179,7 @@ private:
 
     cube_pose_ = geometry_msgs::msg::Pose{};
     constexpr double kOffsetYLateral = 0.01;
-    constexpr double KoffSetXLateral = 0.03 
+    constexpr double KoffSetXLateral = 0.03;
     cube_pose_.position.x = 3.97 + KoffSetXLateral;
     cube_pose_.position.y = -1.10 + kOffsetYLateral;
     cube_pose_.position.z = 0.38;
