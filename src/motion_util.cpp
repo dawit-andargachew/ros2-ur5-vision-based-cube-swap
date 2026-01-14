@@ -26,10 +26,10 @@ namespace motion_util {
     arm_mgi.setMaxAccelerationScalingFactor(0.3);
     
     // Increase planning time to allow more attempts
-    arm_mgi.setPlanningTime(10.0);
+    arm_mgi.setPlanningTime(20.0);
     
     // Set number of planning attempts
-    arm_mgi.setNumPlanningAttempts(10);
+    arm_mgi.setNumPlanningAttempts(30);
     
     // Set goal tolerance (helps with hard-to-reach poses)
     arm_mgi.setGoalPositionTolerance(0.01);  // 1cm position tolerance
@@ -39,8 +39,8 @@ namespace motion_util {
     // Allow replanning during execution if needed
     arm_mgi.allowReplanning(true);
     
-    // Set specific planner (RRTConnect is generally robust)
-    arm_mgi.setPlannerId("RRTConnectkConfigDefault");
+    // // Set specific planner (RRTConnect is generally robust)
+    // arm_mgi.setPlannerId("RRTConnectkConfigDefault");
     
     // Configure gripper as well
     gripper_mgi.setMaxVelocityScalingFactor(0.5);
