@@ -5,11 +5,6 @@ pick_action_server:
     scene.table.y: -1.10
     scene.table.z: 0.322
 
-    scene.cube.base_x: 3.97
-    scene.cube.base_y: -1.10
-    scene.cube.base_z: 0.4
-    scene.cube.offset_x: 0.035
-
     # Cube and AprilTag physical dimensions (meters)
     dimensions.apriltag_size: 0.050        # AprilTag is 0.050x0.050m
     dimensions.cube_width: 0.06            # Cube width (X)
@@ -19,20 +14,38 @@ pick_action_server:
     # AprilTag to cube center transformation
     # AprilTag pose is at cube center but needs lateral correction
     apriltag.tag_to_cube_center_offset: 0.00  # Not used - tag is already at center
-    apriltag.lateral_x_offset: 0.035          # Lateral X correction (trial and error)
+    apriltag.lateral_x_offset: 0.030          # Lateral X correction (trial and error)
 
-    # Side grasp orientation (RPY, radians)
-    # Absolute orientation for Y-axis side approach
-    grasp.rpy.roll: 1.5707    # 90 deg roll to orient gripper for side grasp
-    grasp.rpy.pitch: 0.0      # Horizontal approach
-    grasp.rpy.yaw: 0.0        # No yaw rotation
-    # Grasp positioning offsets (meters)
-    grasp.center_z_offset: -0.05
-    grasp.tool_length_offset: 0.18  # Y offset from cube center
+    # ====================================================================
+    # GRASP CONFIGURATION - Easy switching between top and side grasps
+    # ====================================================================
+    
+    # Grasp Orientation (RPY, radians)
+    # For TOP grasp:   roll=0.0, pitch=3.1415 (π), yaw=0.0 (gripper pointing down)
+    # For SIDE grasp:  roll=0.0, pitch=-1.5707 (-π/2), yaw=0.0 (gripper horizontal)
+    grasp.orientation.roll: 0.0   
+    grasp.orientation.pitch: 3.1415     
+    grasp.orientation.yaw: 0.0
 
-    # Motion distances (meters)
-    motion.pregrasp_approach_dist_z: 0.15  # Pre-grasp Y standoff distance
-    motion.lift_dist_z: 0.20               # Lift distance in Z after grasp
+    # Grasp Position Offsets from cube center (meters)
+    # For TOP grasp:   x=0.0, y=0.0, z=0.18 (tool length above cube)
+    # For SIDE grasp:  x=0.0, y=0.18 (tool length from side), z=0.15 (height offset)
+    grasp.offset.x: 0.0
+    grasp.offset.y: 0.0
+    grasp.offset.z: 0.0
+
+    # Pre-grasp Approach Offsets from grasp pose (meters)
+    # For TOP grasp:   x=0.0, y=0.0, z=0.20 (approach from above)
+    # For SIDE grasp:  x=0.0, y=0.0, z=0.20 (approach from above, then move sideways)
+    grasp.pregrasp_offset.x: 0.0
+    grasp.pregrasp_offset.y: 0.0
+    grasp.pregrasp_offset.z: 0.10
+
+    # Lift Motion Offsets from grasp pose (meters)
+    # Usually lift straight up in Z regardless of grasp type
+    grasp.lift_offset.x: 0.0
+    grasp.lift_offset.y: 0.0
+    grasp.lift_offset.z: 0.10
 
     # Gripper joint targets
     gripper.open: 0.0

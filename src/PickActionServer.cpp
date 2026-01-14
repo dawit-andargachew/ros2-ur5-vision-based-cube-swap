@@ -59,6 +59,21 @@ public:
     cube_pose_client_ = this->create_client<group_6_assignment_2::srv::GetCubePoses>("get_cube_poses");
 
     declare_and_get_parameters();
+    
+    // Load joint configurations from parameters
+    home_joint_config_["shoulder_pan_joint"] = this->get_parameter("home_position.shoulder_pan_joint").as_double();
+    home_joint_config_["shoulder_lift_joint"] = this->get_parameter("home_position.shoulder_lift_joint").as_double();
+    home_joint_config_["elbow_joint"] = this->get_parameter("home_position.elbow_joint").as_double();
+    home_joint_config_["wrist_1_joint"] = this->get_parameter("home_position.wrist_1_joint").as_double();
+    home_joint_config_["wrist_2_joint"] = this->get_parameter("home_position.wrist_2_joint").as_double();
+    home_joint_config_["wrist_3_joint"] = this->get_parameter("home_position.wrist_3_joint").as_double();
+    
+    active_joint_config_["shoulder_pan_joint"] = this->get_parameter("active_position.shoulder_pan_joint").as_double();
+    active_joint_config_["shoulder_lift_joint"] = this->get_parameter("active_position.shoulder_lift_joint").as_double();
+    active_joint_config_["elbow_joint"] = this->get_parameter("active_position.elbow_joint").as_double();
+    active_joint_config_["wrist_1_joint"] = this->get_parameter("active_position.wrist_1_joint").as_double();
+    active_joint_config_["wrist_2_joint"] = this->get_parameter("active_position.wrist_2_joint").as_double();
+    active_joint_config_["wrist_3_joint"] = this->get_parameter("active_position.wrist_3_joint").as_double();
   }
 
   bool run_pick_sequence(uint8_t cube_id, const std::shared_ptr<GoalHandlePick> goal_handle)
@@ -86,10 +101,16 @@ public:
     if (!sense_cube(cube_id)) return false;
     if (goal_handle->is_canceling()) return false;
 
-    // Move to home position (safe position before cleanup)
-    feedback->status = "Moving to home position";
+    // // Move to home position (safe position before cleanup)
+    // feedback->status = "Moving to home position";
+    // goal_handle->publish_feedback(feedback);
+    // if (!motion_util::move_to_joint_configuration(home_joint_config_, arm_group_, "home", get_logger())) return false;
+    // if (goal_handle->is_canceling()) return false;
+
+    //go to active position
+    feedback->status = "Moving to active position";
     goal_handle->publish_feedback(feedback);
-    if (!move_to_home()) return false;
+    if (!motion_util::move_to_joint_configuration(active_joint_config_, arm_group_, "active", get_logger())) return false;
     if (goal_handle->is_canceling()) return false;
 
     // Clean up scene state from any previous attempts (at home position, safe to detach)
@@ -103,15 +124,6 @@ public:
     if (!setup_scene()) return false;
     if (goal_handle->is_canceling()) return false;
     
-    //go to active position
-    feedback->status = "Moving to active position";
-    goal_handle->publish_feedback(feedback);
-    if (!move_to_active()) return false;
-    if (goal_handle->is_canceling()) return false;
-    
-    //we check cancelling after each major step of the pipeline
-    if (goal_handle->is_canceling()) return false;
-
     // Wait for planning scene to update with collision objects
     feedback->status = "Waiting for scene synchronization";
     goal_handle->publish_feedback(feedback);
@@ -172,6 +184,9 @@ private:
   geometry_msgs::msg::Pose cube_pose_{};
   geometry_msgs::msg::Pose grasp_pose_{};
 
+  std::map<std::string, double> home_joint_config_;
+  std::map<std::string, double> active_joint_config_;
+
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr grasp_pose_pub_;
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pregrasp_pose_pub_;
 
@@ -197,11 +212,6 @@ private:
     double table_y = -1.10;
     double table_z = 0.322;
 
-    double cube_base_x = 3.97;
-    double cube_base_y = -1.10;
-    double cube_base_z = 0.4;
-    double cube_offset_x = 0.035;
-
     // Cube and AprilTag dimensions
     double apriltag_size = 0.050;  // AprilTag is 0.050x0.050m
     double cube_width = 0.06;      // Cube is 0.06x0.06x0.1m
@@ -211,16 +221,29 @@ private:
     double tag_to_cube_center_offset = 0.03;  // Half of cube depth (0.06/2)
     double lateral_x_offset = 0.035;          // Lateral X correction
 
-    // Grasp
-    double grasp_roll = 0.0;
-    double grasp_pitch = -1.5707;
-    double grasp_yaw = 0.0;
-    double grasp_center_z_offset = -0.02;
-    double tool_length_offset = 0.18;
+    // Grasp orientation (RPY, radians)
+    double grasp_orientation_roll = 0.0;
+    double grasp_orientation_pitch = -1.5707;
+    double grasp_orientation_yaw = 0.0;
 
-    // Motions
-    double pregrasp_approach_dist_z = 0.15;
-    double lift_dist_z = 0.20;
+    // Grasp position offsets from cube center (meters)
+    // For side grasp: x=0, y=tool_length(~0.18), z=slight_offset(~0.15)
+    // For top grasp:  x=0, y=0, z=tool_length(~0.18)
+    double grasp_offset_x = 0.0;
+    double grasp_offset_y = 0.18;
+    double grasp_offset_z = 0.15;
+
+    // Pre-grasp approach offsets from grasp pose (meters)
+    // For side grasp: approach from above (z=0.20), then descend
+    // For top grasp:  approach from above (z=0.20), then descend
+    double pregrasp_offset_x = 0.0;
+    double pregrasp_offset_y = 0.0;
+    double pregrasp_offset_z = 0.20;
+
+    // Lift motion offsets from grasp pose (meters)
+    double lift_offset_x = 0.0;
+    double lift_offset_y = 0.0;
+    double lift_offset_z = 0.20;
 
     // Gripper
     double gripper_open = 0.0;
@@ -229,75 +252,82 @@ private:
 
   void declare_and_get_parameters()
   {
-    // Scene
-    this->declare_parameter<double>("scene.table.x", params_.table_x);
-    this->declare_parameter<double>("scene.table.y", params_.table_y);
-    this->declare_parameter<double>("scene.table.z", params_.table_z);
-
-    this->declare_parameter<double>("scene.cube.base_x", params_.cube_base_x);
-    this->declare_parameter<double>("scene.cube.base_y", params_.cube_base_y);
-    this->declare_parameter<double>("scene.cube.base_z", params_.cube_base_z);
-    this->declare_parameter<double>("scene.cube.offset_x", params_.cube_offset_x);
+    RCLCPP_INFO(get_logger(), "=== Loading Parameters from YAML ===");
+    
+    // Scene - Use declare_parameter return value (YAML overrides C++ default)
+    params_.table_x = this->declare_parameter("scene.table.x", params_.table_x);
+    params_.table_y = this->declare_parameter("scene.table.y", params_.table_y);
+    params_.table_z = this->declare_parameter("scene.table.z", params_.table_z);
+    RCLCPP_INFO(get_logger(), "Scene: table=[%.3f, %.3f, %.3f]", params_.table_x, params_.table_y, params_.table_z);
 
     // Cube and AprilTag dimensions
-    this->declare_parameter<double>("dimensions.apriltag_size", params_.apriltag_size);
-    this->declare_parameter<double>("dimensions.cube_width", params_.cube_width);
-    this->declare_parameter<double>("dimensions.cube_depth", params_.cube_depth);
-    this->declare_parameter<double>("dimensions.cube_height", params_.cube_height);
-    this->declare_parameter<double>("apriltag.tag_to_cube_center_offset", params_.tag_to_cube_center_offset);
-    this->declare_parameter<double>("apriltag.lateral_x_offset", params_.lateral_x_offset);
+    params_.apriltag_size = this->declare_parameter("dimensions.apriltag_size", params_.apriltag_size);
+    params_.cube_width = this->declare_parameter("dimensions.cube_width", params_.cube_width);
+    params_.cube_depth = this->declare_parameter("dimensions.cube_depth", params_.cube_depth);
+    params_.cube_height = this->declare_parameter("dimensions.cube_height", params_.cube_height);
+    params_.tag_to_cube_center_offset = this->declare_parameter("apriltag.tag_to_cube_center_offset", params_.tag_to_cube_center_offset);
+    params_.lateral_x_offset = this->declare_parameter("apriltag.lateral_x_offset", params_.lateral_x_offset);
+    RCLCPP_INFO(get_logger(), "Cube dimensions: [%.3f x %.3f x %.3f]", params_.cube_width, params_.cube_depth, params_.cube_height);
 
-    // Grasp
-    this->declare_parameter<double>("grasp.rpy.roll", params_.grasp_roll);
-    this->declare_parameter<double>("grasp.rpy.pitch", params_.grasp_pitch);
-    this->declare_parameter<double>("grasp.rpy.yaw", params_.grasp_yaw);
-    this->declare_parameter<double>("grasp.center_z_offset", params_.grasp_center_z_offset);
-    this->declare_parameter<double>("grasp.tool_length_offset", params_.tool_length_offset);
+    // Grasp orientation
+    params_.grasp_orientation_roll = this->declare_parameter("grasp.orientation.roll", params_.grasp_orientation_roll);
+    params_.grasp_orientation_pitch = this->declare_parameter("grasp.orientation.pitch", params_.grasp_orientation_pitch);
+    params_.grasp_orientation_yaw = this->declare_parameter("grasp.orientation.yaw", params_.grasp_orientation_yaw);
+    RCLCPP_INFO(get_logger(), "Grasp orientation (RPY): [%.4f, %.4f, %.4f] rad", 
+                params_.grasp_orientation_roll, params_.grasp_orientation_pitch, params_.grasp_orientation_yaw);
 
-    // Motions
-    this->declare_parameter<double>("motion.pregrasp_approach_dist_z", params_.pregrasp_approach_dist_z);
-    this->declare_parameter<double>("motion.lift_dist_z", params_.lift_dist_z);
+    // Grasp position offsets
+    params_.grasp_offset_x = this->declare_parameter("grasp.offset.x", params_.grasp_offset_x);
+    params_.grasp_offset_y = this->declare_parameter("grasp.offset.y", params_.grasp_offset_y);
+    params_.grasp_offset_z = this->declare_parameter("grasp.offset.z", params_.grasp_offset_z);
+    RCLCPP_WARN(get_logger(), ">>> GRASP OFFSETS: x=%.3f, y=%.3f, z=%.3f <<<", 
+                params_.grasp_offset_x, params_.grasp_offset_y, params_.grasp_offset_z);
+
+    // Pre-grasp approach offsets
+    params_.pregrasp_offset_x = this->declare_parameter("grasp.pregrasp_offset.x", params_.pregrasp_offset_x);
+    params_.pregrasp_offset_y = this->declare_parameter("grasp.pregrasp_offset.y", params_.pregrasp_offset_y);
+    params_.pregrasp_offset_z = this->declare_parameter("grasp.pregrasp_offset.z", params_.pregrasp_offset_z);
+    RCLCPP_INFO(get_logger(), "Pre-grasp offsets: [%.3f, %.3f, %.3f]", 
+                params_.pregrasp_offset_x, params_.pregrasp_offset_y, params_.pregrasp_offset_z);
+
+    // Lift motion offsets
+    params_.lift_offset_x = this->declare_parameter("grasp.lift_offset.x", params_.lift_offset_x);
+    params_.lift_offset_y = this->declare_parameter("grasp.lift_offset.y", params_.lift_offset_y);
+    params_.lift_offset_z = this->declare_parameter("grasp.lift_offset.z", params_.lift_offset_z);
+    RCLCPP_INFO(get_logger(), "Lift offsets: [%.3f, %.3f, %.3f]", 
+                params_.lift_offset_x, params_.lift_offset_y, params_.lift_offset_z);
 
     // Gripper
-    this->declare_parameter<double>("gripper.open", params_.gripper_open);
-    this->declare_parameter<double>("gripper.closed", params_.gripper_closed);
+    params_.gripper_open = this->declare_parameter("gripper.open", params_.gripper_open);
+    params_.gripper_closed = this->declare_parameter("gripper.closed", params_.gripper_closed);
 
-    // Fetch values (including YAML overrides)
-    this->get_parameter("scene.table.x", params_.table_x);
-    this->get_parameter("scene.table.y", params_.table_y);
-    this->get_parameter("scene.table.z", params_.table_z);
+    // Robot target positions (home and active) - Declare here so they're available for constructor
+    this->declare_parameter("home_position.shoulder_pan_joint", 0.0);
+    this->declare_parameter("home_position.shoulder_lift_joint", -1.5708);
+    this->declare_parameter("home_position.elbow_joint", 0.0);
+    this->declare_parameter("home_position.wrist_1_joint", -1.5708);
+    this->declare_parameter("home_position.wrist_2_joint", 0.0);
+    this->declare_parameter("home_position.wrist_3_joint", 0.0);
 
-    this->get_parameter("scene.cube.base_x", params_.cube_base_x);
-    this->get_parameter("scene.cube.base_y", params_.cube_base_y);
-    this->get_parameter("scene.cube.base_z", params_.cube_base_z);
-    this->get_parameter("scene.cube.offset_x", params_.cube_offset_x);
+    this->declare_parameter("active_position.shoulder_pan_joint", -1.64);
+    this->declare_parameter("active_position.shoulder_lift_joint", -1.46);
+    this->declare_parameter("active_position.elbow_joint", 1.12);
+    this->declare_parameter("active_position.wrist_1_joint", -1.48);
+    this->declare_parameter("active_position.wrist_2_joint", -1.37);
+    this->declare_parameter("active_position.wrist_3_joint", -0.38);
 
-    this->get_parameter("dimensions.apriltag_size", params_.apriltag_size);
-    this->get_parameter("dimensions.cube_width", params_.cube_width);
-    this->get_parameter("dimensions.cube_depth", params_.cube_depth);
-    this->get_parameter("dimensions.cube_height", params_.cube_height);
-    this->get_parameter("apriltag.tag_to_cube_center_offset", params_.tag_to_cube_center_offset);
-    this->get_parameter("apriltag.lateral_x_offset", params_.lateral_x_offset);
-
-    this->get_parameter("grasp.rpy.roll", params_.grasp_roll);
-    this->get_parameter("grasp.rpy.pitch", params_.grasp_pitch);
-    this->get_parameter("grasp.rpy.yaw", params_.grasp_yaw);
-    this->get_parameter("grasp.center_z_offset", params_.grasp_center_z_offset);
-    this->get_parameter("grasp.tool_length_offset", params_.tool_length_offset);
-
-    this->get_parameter("motion.pregrasp_approach_dist_z", params_.pregrasp_approach_dist_z);
-    this->get_parameter("motion.lift_dist_z", params_.lift_dist_z);
-
-    this->get_parameter("gripper.open", params_.gripper_open);
-    this->get_parameter("gripper.closed", params_.gripper_closed);
-
-    RCLCPP_INFO(
+    RCLCPP_WARN(get_logger(), "=== FINAL PARAMETER SUMMARY ===");
+    RCLCPP_WARN(
       get_logger(),
-      "Pick params: cube(base)=%.3f,%.3f,%.3f offset_x=%.3f | grasp rpy=%.3f,%.3f,%.3f | z_off=%.3f tool=%.3f | pre_z=%.3f lift_z=%.3f",
-      params_.cube_base_x, params_.cube_base_y, params_.cube_base_z, params_.cube_offset_x,
-      params_.grasp_roll, params_.grasp_pitch, params_.grasp_yaw,
-      params_.grasp_center_z_offset, params_.tool_length_offset,
-      params_.pregrasp_approach_dist_z, params_.lift_dist_z);
+      "GRASP: rpy=[%.3f,%.3f,%.3f] xyz=[%.3f,%.3f,%.3f]",
+      params_.grasp_orientation_roll, params_.grasp_orientation_pitch, params_.grasp_orientation_yaw,
+      params_.grasp_offset_x, params_.grasp_offset_y, params_.grasp_offset_z);
+    RCLCPP_WARN(
+      get_logger(),
+      "PREGRASP: xyz=[%.3f,%.3f,%.3f] | LIFT: xyz=[%.3f,%.3f,%.3f]",
+      params_.pregrasp_offset_x, params_.pregrasp_offset_y, params_.pregrasp_offset_z,
+      params_.lift_offset_x, params_.lift_offset_y, params_.lift_offset_z);
+    RCLCPP_INFO(get_logger(), "=== Parameters loaded successfully ===");
   }
 
 //action callbacks
@@ -374,33 +404,12 @@ private:
       return false;
     }
 
-    // Store the detected AprilTag pose
-    geometry_msgs::msg::Pose apriltag_pose = response->poses[0];
-    RCLCPP_INFO(get_logger(), "Sensed AprilTag %d at: x=%.3f, y=%.3f, z=%.3f",
-                cube_id, apriltag_pose.position.x, apriltag_pose.position.y, apriltag_pose.position.z);
-    
-    // Transform AprilTag pose to cube center pose
-    // AprilTag is mounted on one face of the cube, need to offset to cube center
-    cube_pose_ = transform_apriltag_to_cube_center(apriltag_pose);
-    
-    RCLCPP_INFO(get_logger(), "Transformed to cube center at: x=%.3f, y=%.3f, z=%.3f",
-                cube_pose_.position.x, cube_pose_.position.y, cube_pose_.position.z);
+    // Store the cube center pose (already transformed by CubeDetector service)
+    cube_pose_ = response->poses[0];
+    RCLCPP_INFO(get_logger(), "Sensed cube %d center at: x=%.3f, y=%.3f, z=%.3f",
+                cube_id, cube_pose_.position.x, cube_pose_.position.y, cube_pose_.position.z);
     
     return true;
-  }
-
-  geometry_msgs::msg::Pose transform_apriltag_to_cube_center(const geometry_msgs::msg::Pose& apriltag_pose) const
-  {
-    // AprilTag pose is already at cube center, but needs lateral X correction
-    geometry_msgs::msg::Pose cube_center_pose = apriltag_pose;
-    
-    // Apply lateral X offset (empirical correction from trial and error)
-    cube_center_pose.position.x = apriltag_pose.position.x + params_.lateral_x_offset;
-    
-    // Orientation remains the same as the AprilTag
-    cube_center_pose.orientation = apriltag_pose.orientation;
-    
-    return cube_center_pose;
   }
 
   bool wait_for_robot_state()
@@ -462,58 +471,6 @@ private:
     return false;
   }
 
-  bool move_to_active() {
-    RCLCPP_INFO(get_logger(), "Moving to active position...");
-
-    // Hardcoded active joint configuration (in radians)
-    std::map<std::string, double> active_joints;
-    // 171° (No change needed, within +/- 180)
-    active_joints["shoulder_pan_joint"] = 2.98;
-    active_joints["shoulder_lift_joint"] = -2.39; 
-    active_joints["elbow_joint"] = 1.87;
-    active_joints["wrist_1_joint"] = 0.66;
-    active_joints["wrist_2_joint"] = -0.33;
-    active_joints["wrist_3_joint"] = 2.98;
-
-    arm_group_.setJointValueTarget(active_joints);
-
-    // Try direct move (bypasses explicit planning)
-    auto result = arm_group_.move();
-    if (result != moveit::core::MoveItErrorCode::SUCCESS) {
-        RCLCPP_ERROR(get_logger(), "Direct move to active position failed");
-        return false;
-    }
-
-    RCLCPP_INFO(get_logger(), "Successfully moved to active position");
-    return true;
-  }
-
-  bool move_to_home()
-  {
-    RCLCPP_INFO(get_logger(), "Moving to home position...");
-    
-    // Hardcoded home joint configuration (in radians)
-    std::map<std::string, double> home_joints;
-    home_joints["shoulder_pan_joint"] = 0.0;           // -0°
-    home_joints["shoulder_lift_joint"] = -1.5708;      // -90°
-    home_joints["elbow_joint"] = 0.0;                  // 0°
-    home_joints["wrist_1_joint"] = -1.5708;            // -90°
-    home_joints["wrist_2_joint"] = 0.0;                // 0°
-    home_joints["wrist_3_joint"] = 0.0;                // -0°
-    
-    arm_group_.setJointValueTarget(home_joints);
-    
-    // Try direct move (bypasses explicit planning)
-    auto result = arm_group_.move();
-    if (result != moveit::core::MoveItErrorCode::SUCCESS) {
-      RCLCPP_ERROR(get_logger(), "Direct move to home position failed");
-      return false;
-    }
-    
-    RCLCPP_INFO(get_logger(), "Successfully moved to home position");
-    return true;
-  }
-
   bool cleanup_scene()
   {
     RCLCPP_INFO(get_logger(), "Cleaning up scene state from previous attempts...");
@@ -547,7 +504,6 @@ private:
   bool setup_scene()
   {
     // Defensive check: ensure cube is detached before updating scene
-    // (should have been done in cleanup_scene, but double-check for safety)
     auto attached_objects = planning_scene_.getAttachedObjects();
     if (attached_objects.find(kCubeId) != attached_objects.end()) {
       RCLCPP_WARN(get_logger(), "Cube '%s' still attached, detaching before scene update...", kCubeId);
@@ -560,32 +516,42 @@ private:
     bool table_exists = std::find(existing_objects.begin(), existing_objects.end(), kTableId) != existing_objects.end();
     bool cube_exists = std::find(existing_objects.begin(), existing_objects.end(), kCubeId) != existing_objects.end();
 
-    if (!table_exists || !cube_exists) {
-      // First time: add collision objects to scene
+    // Add table (static, only needs to be added once)
+    if (!table_exists) {
       if (!motion_util::setup_scene(planning_scene_)) {
         return false;
       }
-      RCLCPP_INFO(get_logger(), "Initial scene setup completed");
-    } else {
-      RCLCPP_INFO(get_logger(), "Scene objects already exist, updating poses");
+      RCLCPP_INFO(get_logger(), "Table added to scene");
     }
 
-    // Update table pose from parameters
-    geometry_msgs::msg::Pose table_pose;
-    table_pose.position.x = params_.table_x;
-    table_pose.position.y = params_.table_y;
-    table_pose.position.z = params_.table_z;
-    table_pose.orientation.w = 1.0;
-    motion_util::moveCollisionObject(kTableId, table_pose, kWorldFrame, planning_scene_);
+    // Add or update cube using ONLY sensed position (sense->plan->act)
+    if (!cube_exists) {
+      // First time: add cube collision object with sensed pose
+      moveit_msgs::msg::CollisionObject cube;
+      cube.header.frame_id = kWorldFrame;
+      cube.id = kCubeId;
 
-    // Update cube pose using sensed position (cube_pose_ is set by sense_cube())
-    motion_util::moveCollisionObject(kCubeId, cube_pose_, kWorldFrame, planning_scene_);
+      shape_msgs::msg::SolidPrimitive cube_prim;
+      cube_prim.type = shape_msgs::msg::SolidPrimitive::BOX;
+      cube_prim.dimensions = {params_.cube_width, params_.cube_depth, params_.cube_height};
 
-    // Precompute grasp pose to keep locality: used by pre-grasp/grasp/lift)
+      cube.primitives.push_back(cube_prim);
+      cube.primitive_poses.push_back(cube_pose_);  // Use sensed pose
+      cube.operation = moveit_msgs::msg::CollisionObject::ADD;
+
+      planning_scene_.applyCollisionObject(cube);
+      RCLCPP_INFO(get_logger(), "Cube added to scene at sensed position");
+    } else {
+      // Subsequent times: move cube to updated sensed position
+      motion_util::moveCollisionObject(kCubeId, cube_pose_, kWorldFrame, planning_scene_);
+      RCLCPP_INFO(get_logger(), "Cube position updated to sensed position");
+    }
+
+    // Precompute grasp pose (uses sensed cube_pose_)
     grasp_pose_ = compute_grasp_pose(cube_pose_);
     publish_debug_pose(grasp_pose_, grasp_pose_pub_, kWorldFrame);
     
-    RCLCPP_INFO(get_logger(), "Cube pose: x=%.3f, y=%.3f, z=%.3f", 
+    RCLCPP_INFO(get_logger(), "Cube pose (sensed): x=%.3f, y=%.3f, z=%.3f", 
                 cube_pose_.position.x, cube_pose_.position.y, cube_pose_.position.z);
     RCLCPP_INFO(get_logger(), "Grasp pose: x=%.3f, y=%.3f, z=%.3f", 
                 grasp_pose_.position.x, grasp_pose_.position.y, grasp_pose_.position.z);
@@ -593,42 +559,20 @@ private:
     return true;
   }
 
-  // geometry_msgs::msg::Pose compute_grasp_pose(const geometry_msgs::msg::Pose& cube_pose) const
-  // {
-  //   geometry_msgs::msg::Pose grasp_pose = cube_pose;
-  //   // Top-down pick:
-  //   // - Keep x/y aligned with the cube center
-  //   // - Offset along +Z by the gripper/tool length so the end-effector link (typically at the wrist)
-  //   //   ends up above the grasp point while the fingers can close around the cube.
-  //   grasp_pose.position.y = cube_pose.position.y;
-  //   grasp_pose.position.z = cube_pose.position.z + params_.grasp_center_z_offset + params_.tool_length_offset;
-
-  //   // Orientation for top grasp: gripper approaching downwards
-  //   tf2::Quaternion q;
-  //   const double roll = params_.grasp_roll;
-  //   const double pitch = params_.grasp_pitch;
-  //   const double yaw = params_.grasp_yaw;
-  //   q.setRPY(roll, pitch, yaw);
-  //   q.normalize();
-
-  //   grasp_pose.orientation.x = q.x();
-  //   grasp_pose.orientation.y = q.y();
-  //   grasp_pose.orientation.z = q.z();
-  //   grasp_pose.orientation.w = q.w();
-
-  //   return grasp_pose;
-  // }
   geometry_msgs::msg::Pose compute_grasp_pose(const geometry_msgs::msg::Pose& cube_pose) const
   {
     geometry_msgs::msg::Pose grasp_pose = cube_pose;
-    grasp_pose.position.z = cube_pose.position.z + params_.grasp_center_z_offset;
-    grasp_pose.position.y = cube_pose.position.y + params_.tool_length_offset;
-    // Orientation for side grasp: gripper fingers pointing down, aligned with table
+    
+    // Apply XYZ offsets from cube center to grasp position
+    grasp_pose.position.x = cube_pose.position.x + params_.grasp_offset_x;
+    grasp_pose.position.y = cube_pose.position.y + params_.grasp_offset_y;
+    grasp_pose.position.z = cube_pose.position.z + params_.grasp_offset_z;
+    
+    // Apply grasp orientation
     tf2::Quaternion q;
-    const double roll = params_.grasp_roll;
-    const double pitch = params_.grasp_pitch;
-    const double yaw = params_.grasp_yaw;
-    q.setRPY(roll, pitch, yaw);
+    q.setRPY(params_.grasp_orientation_roll, 
+             params_.grasp_orientation_pitch, 
+             params_.grasp_orientation_yaw);
     q.normalize();
 
     grasp_pose.orientation.x = q.x();
@@ -648,8 +592,11 @@ private:
     }
     
     geometry_msgs::msg::Pose pre_grasp_pose = grasp_pose_;
-    // Approach from the side (increase Y), then move inward to grasp_pose_.
-    pre_grasp_pose.position.y += params_.pregrasp_approach_dist_z;
+    
+    // Apply pre-grasp offsets (defines approach direction)
+    pre_grasp_pose.position.x += params_.pregrasp_offset_x;
+    pre_grasp_pose.position.y += params_.pregrasp_offset_y;
+    pre_grasp_pose.position.z += params_.pregrasp_offset_z;
 
     publish_debug_pose(pre_grasp_pose, pregrasp_pose_pub_, kWorldFrame);
 
@@ -704,8 +651,11 @@ private:
   {
     RCLCPP_INFO(get_logger(), "Lifting object (Cartesian)...");
     geometry_msgs::msg::Pose lift_pose = grasp_pose_;
-    // Lift up in Z direction after side grasp
-    lift_pose.position.z += params_.lift_dist_z;
+    
+    // Apply lift offsets from grasp position
+    lift_pose.position.x += params_.lift_offset_x;
+    lift_pose.position.y += params_.lift_offset_y;
+    lift_pose.position.z += params_.lift_offset_z;
 
     std::vector<geometry_msgs::msg::Pose> waypoints;
     waypoints.push_back(lift_pose);
@@ -716,8 +666,11 @@ private:
   {
     RCLCPP_INFO(get_logger(), "Lifting object (Non-Cartesian)...");
     geometry_msgs::msg::Pose lift_pose = grasp_pose_;
-    // Lift up in Z direction after side grasp
-    lift_pose.position.z += params_.lift_dist_z;
+    
+    // Apply lift offsets from grasp position
+    lift_pose.position.x += params_.lift_offset_x;
+    lift_pose.position.y += params_.lift_offset_y;
+    lift_pose.position.z += params_.lift_offset_z;
 
     return plan_and_execute_to_pose(lift_pose, arm_group_, get_logger());
   }

@@ -47,10 +47,35 @@ public:
         tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
         tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
+        // Declare parameters for AprilTag to cube center transformation
+        offset_x_ = this->declare_parameter("apriltag_to_cube.offset_x", 0.030);
+        offset_y_ = this->declare_parameter("apriltag_to_cube.offset_y", -0.030);
+        offset_z_ = this->declare_parameter("apriltag_to_cube.offset_z", -0.060);
+
         RCLCPP_INFO(this->get_logger(), "Cube Detector Service is ready.");
+        RCLCPP_INFO(this->get_logger(), "AprilTag-to-cube offsets: x=%.3f, y=%.3f, z=%.3f", 
+                    offset_x_, offset_y_, offset_z_);
     }
 private:
     static constexpr int FIND_TF_TIMEOUT_MS = 200;
+    
+    // Transformation offsets from AprilTag pose to cube center
+    double offset_x_;
+    double offset_y_;
+    double offset_z_;
+
+    geometry_msgs::msg::Pose transform_apriltag_to_cube_center(const geometry_msgs::msg::Pose& apriltag_pose) const
+    {
+        // Transform AprilTag pose to cube center by applying calibrated offsets
+        geometry_msgs::msg::Pose cube_center_pose = apriltag_pose;
+        
+        cube_center_pose.position.x = apriltag_pose.position.x + offset_x_;
+        cube_center_pose.position.y = apriltag_pose.position.y + offset_y_;
+        cube_center_pose.position.z = apriltag_pose.position.z + offset_z_;
+        cube_center_pose.orientation = apriltag_pose.orientation;
+        
+        return cube_center_pose;
+    }
 
     void handle_get_cube_poses(
         const std::shared_ptr<GetCubePoses::Request> request,
@@ -101,10 +126,14 @@ private:
                 tag_pose.position.y = tag_transform.transform.translation.y;
                 tag_pose.position.z = tag_transform.transform.translation.z;
                 tag_pose.orientation = tag_transform.transform.rotation;
+                
+                // Transform from AprilTag pose to cube center pose
+                geometry_msgs::msg::Pose cube_center_pose = transform_apriltag_to_cube_center(tag_pose);
+                
                 //add to response
                 response->detected_ids.push_back(cube_id);
-                response->poses.push_back(tag_pose);
-                RCLCPP_INFO(this->get_logger(), "Found pose for tag36h11:%d.", cube_id);   
+                response->poses.push_back(cube_center_pose);
+                RCLCPP_INFO(this->get_logger(), "Found tag36h11:%d, transformed to cube center.", cube_id);   
                 
             }
             catch (tf2::TransformException &ex)

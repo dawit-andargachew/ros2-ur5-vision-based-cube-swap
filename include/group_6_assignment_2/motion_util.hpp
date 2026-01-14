@@ -50,6 +50,11 @@ namespace motion_util {
     bool attachObject(const std::string& object_id, moveit::planning_interface::MoveGroupInterface& mgi, const rclcpp::Logger& logger);
     bool detachObject(const std::string& object_id, moveit::planning_interface::MoveGroupInterface& mgi, const rclcpp::Logger& logger);
 
+    bool move_to_joint_configuration(const std::map<std::string, double>& joint_targets,
+                                     moveit::planning_interface::MoveGroupInterface& arm_mgi,
+                                     const std::string& configuration_name,
+                                     const rclcpp::Logger& logger);
+
     void log_result(const rclcpp::Logger& logger,
                             const std::string& action,
                             const moveit::core::MoveItErrorCode& code);

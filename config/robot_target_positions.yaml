@@ -1,0 +1,34 @@
+/**:
+  ros__parameters:
+    # ====================================================================
+    # ROBOT TARGET JOINT POSITIONS
+    # Define named joint configurations for common robot poses
+    # All angles in radians
+    # ====================================================================
+    
+    # Home Position - Safe neutral pose
+    # Typically used as starting position and between operations
+    home_position:
+      shoulder_pan_joint: 0.0           # 0°
+      shoulder_lift_joint: -1.5708      # -90°
+      elbow_joint: 0.0                  # 0°
+      wrist_1_joint: -1.5708            # -90°
+      wrist_2_joint: 0.0                # 0°
+      wrist_3_joint: 0.0                # 0°
+    
+    # Active Position - Ready position near workspace
+    # Position from which pick operations begin
+    active_position:
+      # shoulder_pan_joint: -0.93        # -53.3°
+      # shoulder_lift_joint: -1.33       # -76.2°
+      # elbow_joint: 0.65                # 37.2°
+      # wrist_1_joint: -0.89             # -51.0°
+      # wrist_2_joint: -1.57             # -90.0°
+      # wrist_3_joint: 1.52              # 87.1°
+      shoulder_pan_joint: -0.78        # -44.7°
+      shoulder_lift_joint: -1.25       # -71.6°
+      elbow_joint: 0.60                # 34.4°
+      wrist_1_joint: -1.10             # -63.0°
+      wrist_2_joint: -1.57             # -90.0°
+      wrist_3_joint: 1.52              # 87.1°
+      

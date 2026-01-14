@@ -55,6 +55,9 @@ def generate_launch_description():
 			PathJoinSubstitution(
 				[FindPackageShare("group_6_assignment_2"), "config", "pick_action_server.yaml"]
 			),
+			PathJoinSubstitution(
+				[FindPackageShare("group_6_assignment_2"), "config", "robot_target_positions.yaml"]
+			),
 			moveit_config.to_dict(),
 		],
 	)

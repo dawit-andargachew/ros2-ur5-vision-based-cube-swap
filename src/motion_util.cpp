@@ -26,7 +26,7 @@ namespace motion_util {
     arm_mgi.setMaxAccelerationScalingFactor(0.3);
     
     // Increase planning time to allow more attempts
-    arm_mgi.setPlanningTime(30.0);
+    arm_mgi.setPlanningTime(10.0);
     
     // Set number of planning attempts
     arm_mgi.setNumPlanningAttempts(10);
@@ -69,7 +69,7 @@ namespace motion_util {
 
     bool setup_scene(moveit::planning_interface::PlanningSceneInterface& planning_scene_)
     {
-        // ---- 1) Table collision object
+        // ---- 1) Table collision object (static, can be hardcoded)
         moveit_msgs::msg::CollisionObject table;
         table.header.frame_id = kWorldFrame;
         table.id = kTableId;
@@ -78,7 +78,7 @@ namespace motion_util {
         table_prim.type = shape_msgs::msg::SolidPrimitive::BOX;
         table_prim.dimensions = {0.3652, 0.3652, 0.016}; //static world table
 
-        geometry_msgs::msg::Pose table_pose; //manual pose b/c static -> but maybe we can calculate based on the initial cube poses
+        geometry_msgs::msg::Pose table_pose;
         table_pose.position.x = 3.97;
         table_pose.position.y = -1.10;
         table_pose.position.z = 0.322;
@@ -88,28 +88,7 @@ namespace motion_util {
         table.primitive_poses.push_back(table_pose);
         table.operation = moveit_msgs::msg::CollisionObject::ADD;
 
-        // ---- 2) Cube collision object (also store pose for later planning)
-        moveit_msgs::msg::CollisionObject cube;
-        cube.header.frame_id = kWorldFrame;
-        cube.id = kCubeId;
-
-        shape_msgs::msg::SolidPrimitive cube_prim;
-        cube_prim.type = shape_msgs::msg::SolidPrimitive::BOX;
-        cube_prim.dimensions = {0.06, 0.06, 0.1};
-
-        geometry_msgs::msg::Pose cube_pose_{};
-        constexpr double kOffsetXLateral = +0.035; //trial and error
-        cube_pose_ = geometry_msgs::msg::Pose{};
-        cube_pose_.position.x = 3.97 + kOffsetXLateral;
-        cube_pose_.position.y = -1.10;
-        cube_pose_.position.z = 0.4;
-        cube_pose_.orientation.w = 1.0;
-
-        cube.primitives.push_back(cube_prim);
-        cube.primitive_poses.push_back(cube_pose_);
-        cube.operation = moveit_msgs::msg::CollisionObject::ADD;
-
-        planning_scene_.applyCollisionObjects({table, cube});
+        planning_scene_.applyCollisionObject(table);
 
         // Give PlanningSceneInterface a beat to help sim
         rclcpp::sleep_for(500ms);
@@ -220,6 +199,25 @@ namespace motion_util {
             RCLCPP_ERROR(logger, "Failed to detach '%s'", object_id.c_str());
         }
         return ok;
+    }
+
+    bool move_to_joint_configuration(const std::map<std::string, double>& joint_targets,
+                                     moveit::planning_interface::MoveGroupInterface& arm_mgi,
+                                     const std::string& configuration_name,
+                                     const rclcpp::Logger& logger)
+    {
+        RCLCPP_INFO(logger, "Moving to %s configuration...", configuration_name.c_str());
+        
+        arm_mgi.setJointValueTarget(joint_targets);
+        auto result = arm_mgi.move();
+        
+        if (result != moveit::core::MoveItErrorCode::SUCCESS) {
+            RCLCPP_ERROR(logger, "Failed to move to %s configuration", configuration_name.c_str());
+            return false;
+        }
+        
+        RCLCPP_INFO(logger, "Successfully moved to %s configuration", configuration_name.c_str());
+        return true;
     }
 
 
