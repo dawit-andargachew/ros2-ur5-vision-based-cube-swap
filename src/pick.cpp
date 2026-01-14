@@ -41,16 +41,16 @@ public:
     // 3. Move to "Pre-Grasp" (Hover above cube)
     if (!move_to_pre_grasp()) return false;
 
-    // 4. Open Gripper (Explicitly called here)
+    // 4. Open Gripper
     if (!open_gripper()) return false;
 
     // 5. Move Down to Grasp
     if (!move_to_grasp_cartesian()) return false;
 
-    // 6. Close Gripper (Grab cube)
+    // 6. Close Gripper
     if (!close_gripper()) return false;
 
-    // 7. Attach object to robot logic
+    // 7. Attach object logic
     if (!attach_object()) return false;
 
     // 8. Lift Up
@@ -72,14 +72,11 @@ private:
   static constexpr const char* kTableId = "surface_collision";
 
   static constexpr double kOpenVal = 0.0;
-  static constexpr double kClosedVal = 0.8;  // Changed to 0.8 to ensure tight grip (0.1 might be too loose)
+  static constexpr double kClosedVal = 0.8;
 
-  // --- HEIGHT ADJUSTMENT (UP/DOWN) ---
-  static constexpr double kGripperLengthOffset = 0.05; // it was 0.30 before 
-  
-  // --- SIDE ADJUSTMENT (LEFT/RIGHT) --- even minor changes make it worse
-  static constexpr double kLateralOffset = 0.01;  // it was 0.02 before
-
+  // --- HEIGHT & SIDE ADJUSTMENTS ---
+  static constexpr double kGripperLengthOffset = 0.05;
+  static constexpr double kLateralOffset = 0.01;
   static constexpr double kGraspCenterZOffset = 0.05; 
   static constexpr double kPreGraspApproachDist = 0.15;
 
@@ -103,6 +100,41 @@ private:
     // Initial check of state
     (void)arm_group_.getCurrentState(2.0);
     (void)gripper_group_.getCurrentState(2.0);
+
+    // Apply the structural constraints immediately
+    apply_path_constraints();
+  }
+
+  // =========================================================
+  //  THE CONSTRAINT FUNCTION (Standard ROS 2 Style)
+  // =========================================================
+  void apply_path_constraints()
+  {
+    moveit_msgs::msg::Constraints path_constraints;
+    path_constraints.name = "elbow_up_constraint";
+
+    moveit_msgs::msg::JointConstraint lift_constraint;
+    lift_constraint.joint_name = "shoulder_lift_joint";
+    
+    // Target position (Elbow Up)
+    lift_constraint.position = -1.50; 
+    
+    // Tolerances
+    lift_constraint.tolerance_above = 1.5; 
+    lift_constraint.tolerance_below = 1.0; 
+    
+    // Weight
+    lift_constraint.weight = 1.0;
+
+    path_constraints.joint_constraints.push_back(lift_constraint);
+
+    // Apply to the group
+    arm_group_.setPathConstraints(path_constraints);
+    
+    // Optional: Loosen goal tolerance slightly to help planner succeed with constraints
+    arm_group_.setGoalJointTolerance(0.01); 
+
+    RCLCPP_INFO(get_logger(), "Path Constraints applied: Keeping Elbow Up.");
   }
 
   static void log_result(rclcpp::Logger logger, const std::string& action,
@@ -117,6 +149,7 @@ private:
 
   bool setup_scene()
   {
+    // --- Table ---
     moveit_msgs::msg::CollisionObject table;
     table.header.frame_id = kWorldFrame;
     table.id = kTableId;
@@ -135,6 +168,7 @@ private:
     table.primitive_poses.push_back(table_pose);
     table.operation = moveit_msgs::msg::CollisionObject::ADD;
 
+    // --- Cube ---
     moveit_msgs::msg::CollisionObject cube;
     cube.header.frame_id = kWorldFrame;
     cube.id = kCubeId;
@@ -144,12 +178,7 @@ private:
     cube_prim.dimensions = {0.06, 0.06, 0.1};
 
     cube_pose_ = geometry_msgs::msg::Pose{};
-
     constexpr double kOffsetYLateral = 0.01;
-    // negavtives like -0.08,  doesnt' work
-    // 0.02
-
-
     cube_pose_.position.x = 3.97;
     cube_pose_.position.y = -1.10 + kOffsetYLateral;
     cube_pose_.position.z = 0.4;
@@ -162,7 +191,6 @@ private:
     planning_scene_.applyCollisionObjects({table, cube});
     rclcpp::sleep_for(500ms);
 
-    // Compute the grasp pose
     grasp_pose_ = compute_grasp_pose(cube_pose_);
     return true;
   }
@@ -171,50 +199,48 @@ private:
   {
     RCLCPP_INFO(get_logger(), "Moving to 'Elbow Up' Ready Pose...");
     std::map<std::string, double> target_joints;
-    target_joints["shoulder_pan_joint"] = -1.70; // -1.64;
+    target_joints["shoulder_pan_joint"] = -1.70;
     target_joints["shoulder_lift_joint"] = -1.46;
-   
+    
     arm_group_.setJointValueTarget(target_joints);
-    arm_group_.setMaxVelocityScalingFactor(0.5);
     
     moveit::planning_interface::MoveGroupInterface::Plan plan;
-    if (arm_group_.plan(plan) != moveit::core::MoveItErrorCode::SUCCESS) return false;
-    return arm_group_.execute(plan) == moveit::core::MoveItErrorCode::SUCCESS;
+    const auto plan_result = arm_group_.plan(plan);
+    if (plan_result != moveit::core::MoveItErrorCode::SUCCESS) {
+         log_result(get_logger(), "Plan Ready Pose", plan_result);
+         return false;
+    }
+    const auto exec_result = arm_group_.execute(plan);
+    return exec_result == moveit::core::MoveItErrorCode::SUCCESS;
   }
 
   geometry_msgs::msg::Pose compute_grasp_pose(const geometry_msgs::msg::Pose& cube_pose) const
   {
     geometry_msgs::msg::Pose grasp_pose = cube_pose;
-   
-    // === FIX 1: APPLY HEIGHT OFFSET (UP) ===
+    
+    // Apply offsets
     grasp_pose.position.z = cube_pose.position.z + kGripperLengthOffset + kGraspCenterZOffset;
-    
-    // === FIX 2: APPLY LATERAL OFFSET (LEFT) ===
-    // This was missing in your code! Now it adds the 0.02m (2cm) shift.
     grasp_pose.position.y = cube_pose.position.y + kLateralOffset;
-    
     grasp_pose.position.x = cube_pose.position.x;
-   
+    
     tf2::Quaternion q;
-    // Orientation: 3.14 (180 deg) points down. 
-    q.setRPY(0.0, 3.1415, 0.0);
+    q.setRPY(0.0, 3.1415, 0.0); // Facing down
     q.normalize();
 
     grasp_pose.orientation.x = q.x();
     grasp_pose.orientation.y = q.y();
     grasp_pose.orientation.z = q.z();
     grasp_pose.orientation.w = q.w();
-   
+    
     return grasp_pose;
   }
 
   bool move_to_pre_grasp()
   {
     geometry_msgs::msg::Pose pre_grasp_pose = grasp_pose_;
-    // Approach from TOP (Z-axis)
     pre_grasp_pose.position.z += kPreGraspApproachDist;
 
-    RCLCPP_INFO(get_logger(), "Planning to pre-grasp pose (Top approach)...");
+    RCLCPP_INFO(get_logger(), "Planning to pre-grasp pose...");
     arm_group_.setPoseTarget(pre_grasp_pose);
 
     moveit::planning_interface::MoveGroupInterface::Plan plan;
@@ -232,28 +258,24 @@ private:
   {
       RCLCPP_INFO(get_logger(), "Opening gripper...");
       gripper_group_.setStartStateToCurrentState();
-  
-      // Use the explicit joint value (0.0) instead of the name "open"
+   
       std::map<std::string, double> joint_values;
       joint_values[kActiveJointName] = kOpenVal; 
-  
+   
       gripper_group_.setJointValueTarget(joint_values);
       
-      // Using move() is simpler and often more reliable for single joints
       const auto result = gripper_group_.move(); 
-      
       log_result(get_logger(), "Open gripper", result);
       return result == moveit::core::MoveItErrorCode::SUCCESS;
   }
 
   bool move_to_grasp_cartesian()
   {
-    RCLCPP_INFO(get_logger(), "Approaching object (Cartesian Down)...");
+    RCLCPP_INFO(get_logger(), "Approaching object (Cartesian)...");
     std::vector<geometry_msgs::msg::Pose> waypoints;
     waypoints.push_back(grasp_pose_);
 
     moveit_msgs::msg::RobotTrajectory traj;
-    // Lower velocity for the final approach
     const double fraction = arm_group_.computeCartesianPath(waypoints, 0.01, 0.0, traj);
 
     if (fraction < 0.9) {
@@ -278,7 +300,6 @@ private:
     const auto result = gripper_group_.move();
     log_result(get_logger(), "Close gripper", result);
 
-    // Wait for the gripper to physically close in Sim
     rclcpp::sleep_for(2s);
     return result == moveit::core::MoveItErrorCode::SUCCESS;
   }
