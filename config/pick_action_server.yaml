@@ -45,8 +45,8 @@ pick_action_server:
     # Usually lift straight up in Z regardless of grasp type
     grasp.lift_offset.x: 0.0
     grasp.lift_offset.y: 0.0
-    grasp.lift_offset.z: 0.15 #dawit
+    grasp.lift_offset.z:  0.07 # 0.15 #dawit
 
     # Gripper joint targets
     gripper.open: 0.0
-    gripper.closed: 0.095
+    gripper.closed: 0.098 ## works better than 0.095

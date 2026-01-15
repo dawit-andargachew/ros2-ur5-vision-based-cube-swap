@@ -87,7 +87,7 @@ int main(int argc, char* argv[])
 {
   rclcpp::init(argc, argv);
   auto node = std::make_shared<PickActionClient>();
-  node->send_goal(1);  // Send goal for cube_id 1
+  node->send_goal(10);  // Send goal for cube_id 1, and 10 for cube two
   rclcpp::spin(node);
   rclcpp::shutdown();
   return 0;
