@@ -49,7 +49,7 @@ public:
 
         // Declare parameters for AprilTag to cube center transformation
         offset_x_ = this->declare_parameter("apriltag_to_cube.offset_x", 0.030);
-        offset_y_ = this->declare_parameter("apriltag_to_cube.offset_y", -0.030);
+        offset_y_ = this->declare_parameter("apriltag_to_cube.offset_y", 0.00);
         offset_z_ = this->declare_parameter("apriltag_to_cube.offset_z", -0.060);
 
         RCLCPP_INFO(this->get_logger(), "Cube Detector Service is ready.");

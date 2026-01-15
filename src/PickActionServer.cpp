@@ -145,7 +145,7 @@ public:
 
     feedback->status = "Moving to grasp position";
     goal_handle->publish_feedback(feedback);
-    if (!move_to_grasp_non_cartesian()) return false;
+    if (!move_to_grasp_cartesian()) return false;
     if (goal_handle->is_canceling()) return false;
 
     feedback->status = "Closing gripper and attaching object";
@@ -160,7 +160,7 @@ public:
 
     feedback->status = "Lifting object";
     goal_handle->publish_feedback(feedback);
-    if (!lift_up_non_cartesian()) return false;
+    if (!lift_up_cartesian()) return false;
     if (goal_handle->is_canceling()) return false;
 
     feedback->status = "Pick sequence complete";
@@ -619,7 +619,7 @@ private:
     std::vector<geometry_msgs::msg::Pose> waypoints;
     waypoints.push_back(grasp_pose_);
     const double eef_step = 0.01;
-    return executeCartesianPath(waypoints, eef_step, 0.9, arm_group_, get_logger());
+    return executeCartesianPath(waypoints, eef_step, 0.15, arm_group_, get_logger());
   }
 
   bool move_to_grasp_non_cartesian()
@@ -659,7 +659,7 @@ private:
 
     std::vector<geometry_msgs::msg::Pose> waypoints;
     waypoints.push_back(lift_pose);
-    return executeCartesianPath(waypoints, 0.01, 0.5, arm_group_, get_logger());
+    return executeCartesianPath(waypoints, 0.01, 0.15, arm_group_, get_logger());
   }
 
   bool lift_up_non_cartesian()
