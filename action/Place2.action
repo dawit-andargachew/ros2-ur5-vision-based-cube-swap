@@ -1,9 +1,0 @@
-# Goal
-int32 cube_id
-geometry_msgs/Pose place_pose
----
-# Result
-bool success
----
-# Feedback
-string status

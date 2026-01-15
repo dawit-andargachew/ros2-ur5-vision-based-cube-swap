@@ -20,7 +20,7 @@ public:
     client_ = rclcpp_action::create_client<Place>(this, "place");
   }
 
-  void send_goal(uint8_t reference_cube_id)
+  void send_goal(uint8_t grabbed_cube_id, uint8_t target_table_id)
   {
     if (!client_->wait_for_action_server(10s)) {
       RCLCPP_ERROR(get_logger(), "Place action server not available");
@@ -28,7 +28,8 @@ public:
     }
 
     Place::Goal goal;
-    goal.reference_cube_id = reference_cube_id;
+    goal.grabbed_cube_id = grabbed_cube_id;
+    goal.target_table_id = target_table_id;
 
     auto options = rclcpp_action::Client<Place>::SendGoalOptions();
     options.feedback_callback =
@@ -64,7 +65,7 @@ int main(int argc, char** argv)
 {
   rclcpp::init(argc, argv);
   auto node = std::make_shared<PlaceActionClient>();
-  node->send_goal(10);  // place relative to cube 2
+  node->send_goal(1, 2);  // place relative to cube 2
   rclcpp::spin(node);
   rclcpp::shutdown();
   return 0;

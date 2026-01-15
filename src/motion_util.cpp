@@ -92,28 +92,50 @@ namespace motion_util {
 
     bool setup_scene(moveit::planning_interface::PlanningSceneInterface& planning_scene_)
     {
-        // ---- 1) Table collision object (static, can be hardcoded)
-        moveit_msgs::msg::CollisionObject table;
-        table.header.frame_id = kWorldFrame;
-        table.id = kTableId;
+        // Add static table collision objects
+        // Table 1
+        moveit_msgs::msg::CollisionObject table1;
+        table1.header.frame_id = kWorldFrame;
+        table1.id = "table_1";
 
-        shape_msgs::msg::SolidPrimitive table_prim;
-        table_prim.type = shape_msgs::msg::SolidPrimitive::BOX;
-        table_prim.dimensions = {0.3652, 0.3652, 0.016}; //static world table
+        shape_msgs::msg::SolidPrimitive table1_prim;
+        table1_prim.type = shape_msgs::msg::SolidPrimitive::BOX;
+        table1_prim.dimensions = {0.3652, 0.3652, 0.016};
 
-        geometry_msgs::msg::Pose table_pose;
-        table_pose.position.x = 3.97;
-        table_pose.position.y = -1.10;
-        table_pose.position.z = 0.322;
-        table_pose.orientation.w = 1.0;
+        geometry_msgs::msg::Pose table1_pose;
+        table1_pose.position.x = 3.97;
+        table1_pose.position.y = -1.10;
+        table1_pose.position.z = 0.322;
+        table1_pose.orientation.w = 1.0;
 
-        table.primitives.push_back(table_prim);
-        table.primitive_poses.push_back(table_pose);
-        table.operation = moveit_msgs::msg::CollisionObject::ADD;
+        table1.primitives.push_back(table1_prim);
+        table1.primitive_poses.push_back(table1_pose);
+        table1.operation = moveit_msgs::msg::CollisionObject::ADD;
 
-        planning_scene_.applyCollisionObject(table);
+        // Table 2
+        moveit_msgs::msg::CollisionObject table2;
+        table2.header.frame_id = kWorldFrame;
+        table2.id = "table_2";
 
-        // Give PlanningSceneInterface a beat to help sim
+        shape_msgs::msg::SolidPrimitive table2_prim;
+        table2_prim.type = shape_msgs::msg::SolidPrimitive::BOX;
+        table2_prim.dimensions = {0.3652, 0.3652, 0.016};
+
+        geometry_msgs::msg::Pose table2_pose;
+        table2_pose.position.x = 4.56;
+        table2_pose.position.y = -0.50;  // Different Y position for second table
+        table2_pose.position.z = 0.322;
+        table2_pose.orientation.w = 1.0;
+
+        table2.primitives.push_back(table2_prim);
+        table2.primitive_poses.push_back(table2_pose);
+        table2.operation = moveit_msgs::msg::CollisionObject::ADD;
+
+        // Apply both tables to the scene
+        planning_scene_.applyCollisionObject(table1);
+        planning_scene_.applyCollisionObject(table2);
+
+        // Give PlanningSceneInterface time to process
         rclcpp::sleep_for(500ms);
 
         return true;

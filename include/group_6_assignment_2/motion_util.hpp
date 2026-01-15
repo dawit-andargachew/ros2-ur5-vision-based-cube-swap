@@ -63,8 +63,6 @@ namespace motion_util {
     static constexpr const char* kGripperGroupName = "ir_gripper";  
     static constexpr const char* kActiveJointName = "robotiq_85_left_knuckle_joint";
     static constexpr const char* kWorldFrame = "world";
-    static constexpr const char* kCubeId = "target_cube";
-    static constexpr const char* kTableId = "surface_collision";
     static constexpr double kOpenVal = 0.0;
     static constexpr double kClosedVal = 0.10;  // tune for collisions
 
