@@ -19,31 +19,54 @@ namespace motion_util {
     // }
 
     // In motion_util.cpp, update configure_moveit:
+    // void configure_moveit(moveit::planning_interface::MoveGroupInterface& arm_mgi,
+    //                     moveit::planning_interface::MoveGroupInterface& gripper_mgi) {
+    //     // More balanced settings
+    //     arm_mgi.setMaxVelocityScalingFactor(0.5);  // Increased from 0.3
+    //     arm_mgi.setMaxAccelerationScalingFactor(0.4);
+    //     arm_mgi.setPlanningTime(10.0);  // Reduced from 20.0
+    //     arm_mgi.setNumPlanningAttempts(10);  // Reduced from 50
+        
+    //     // Use relaxed tolerances
+    //     arm_mgi.setGoalPositionTolerance(0.015);  // 1.5cm
+    //     arm_mgi.setGoalOrientationTolerance(0.1);  // ~5.7 degrees
+    //     arm_mgi.setGoalJointTolerance(0.02);
+        
+    //     // // Set a robust planner
+    //     // arm_mgi.setPlannerId("RRTConnect");
+        
+    //     // For Cartesian paths, use:
+    //     arm_mgi.setMaxVelocityScalingFactor(0.3);  // Slower for precision
+    //     arm_mgi.setPlanningTime(15.0);  // Longer for Cartesian
+        
+    //     // Gripper settings
+    //     gripper_mgi.setMaxVelocityScalingFactor(0.8);
+    //     gripper_mgi.setMaxAccelerationScalingFactor(0.8);
+    //     gripper_mgi.setPlanningTime(5.0);
+    //     gripper_mgi.setNumPlanningAttempts(3);
+    // }
+
     void configure_moveit(moveit::planning_interface::MoveGroupInterface& arm_mgi,
-                        moveit::planning_interface::MoveGroupInterface& gripper_mgi) {
-        // More balanced settings
-        arm_mgi.setMaxVelocityScalingFactor(0.5);  // Increased from 0.3
-        arm_mgi.setMaxAccelerationScalingFactor(0.4);
-        arm_mgi.setPlanningTime(10.0);  // Reduced from 20.0
-        arm_mgi.setNumPlanningAttempts(10);  // Reduced from 50
+                    moveit::planning_interface::MoveGroupInterface& gripper_mgi) {
+        // Consistent arm settings - optimized for reliability
+        arm_mgi.setMaxVelocityScalingFactor(0.4);  // Moderate speed
+        arm_mgi.setMaxAccelerationScalingFactor(0.3);  // Smooth acceleration
+        arm_mgi.setPlanningTime(15.0);  // More time for complex plans
+        arm_mgi.setNumPlanningAttempts(15);  // More attempts
         
-        // Use relaxed tolerances
-        arm_mgi.setGoalPositionTolerance(0.015);  // 1.5cm
-        arm_mgi.setGoalOrientationTolerance(0.1);  // ~5.7 degrees
-        arm_mgi.setGoalJointTolerance(0.02);
+        // Relaxed tolerances for higher success rate
+        arm_mgi.setGoalPositionTolerance(0.02);  // 2cm
+        arm_mgi.setGoalOrientationTolerance(0.15);  // ~8.6 degrees
+        arm_mgi.setGoalJointTolerance(0.03);
         
-        // // Set a robust planner
-        // arm_mgi.setPlannerId("RRTConnect");
-        
-        // For Cartesian paths, use:
-        arm_mgi.setMaxVelocityScalingFactor(0.3);  // Slower for precision
-        arm_mgi.setPlanningTime(15.0);  // Longer for Cartesian
+        // Use reliable planner
+        arm_mgi.setPlannerId("RRTConnect");
         
         // Gripper settings
         gripper_mgi.setMaxVelocityScalingFactor(0.8);
         gripper_mgi.setMaxAccelerationScalingFactor(0.8);
         gripper_mgi.setPlanningTime(5.0);
-        gripper_mgi.setNumPlanningAttempts(3);
+        gripper_mgi.setNumPlanningAttempts(5);
     }
 
 

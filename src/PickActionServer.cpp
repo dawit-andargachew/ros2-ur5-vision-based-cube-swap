@@ -150,14 +150,14 @@ public:
     if (!move_to_grasp_cartesian()) return false;
     if (goal_handle->is_canceling()) return false;
 
-    feedback->status = "Closing gripper and attaching object";
-    goal_handle->publish_feedback(feedback);
-    if (!close_gripper()) return false;
-    if (goal_handle->is_canceling()) return false;
-
     feedback->status = "Attaching object to gripper";
     goal_handle->publish_feedback(feedback);
     if (!attach_object()) return false;
+    if (goal_handle->is_canceling()) return false;
+
+    feedback->status = "Closing gripper after attaching object";
+    goal_handle->publish_feedback(feedback);
+    if (!close_gripper()) return false;
     if (goal_handle->is_canceling()) return false;
 
     feedback->status = "Lifting object";

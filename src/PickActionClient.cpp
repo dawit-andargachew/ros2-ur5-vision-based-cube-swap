@@ -87,7 +87,15 @@ int main(int argc, char* argv[])
 {
   rclcpp::init(argc, argv);
   auto node = std::make_shared<PickActionClient>();
-  node->send_goal(1);  // Send goal for cube_id 1
+  
+  // Parse cube_id from command-line argument (default: 1)
+  uint8_t cube_id = 1;
+  if (argc > 1) {
+    cube_id = static_cast<uint8_t>(std::stoi(argv[1]));
+  }
+  
+  RCLCPP_INFO(node->get_logger(), "Sending pick goal for cube_id: %d", cube_id);
+  node->send_goal(cube_id);
   rclcpp::spin(node);
   rclcpp::shutdown();
   return 0;

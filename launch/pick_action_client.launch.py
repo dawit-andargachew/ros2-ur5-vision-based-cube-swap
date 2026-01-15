@@ -9,6 +9,7 @@ from moveit_configs_utils import MoveItConfigsBuilder
 
 def generate_launch_description():
     use_sim_time = LaunchConfiguration("use_sim_time")
+    cube_id = LaunchConfiguration("cube_id")
 
     # Keep the exact same MoveIt config pattern as the example scaffold.
     moveit_config_pkg = "ir_movit_config"
@@ -21,6 +22,7 @@ def generate_launch_description():
         executable="pick_action_client",
         name="pick_action_client",
         output="screen",
+        arguments=[cube_id],
         parameters=[
             {"use_sim_time": use_sim_time},
             moveit_config.to_dict(),
@@ -33,6 +35,11 @@ def generate_launch_description():
                 "use_sim_time",
                 default_value="true",
                 description="Use simulation clock if true",
+            ),
+            DeclareLaunchArgument(
+                "cube_id",
+                default_value="1",
+                description="ID of the cube to pick",
             ),
             pick_action_client_node,
         ]

@@ -33,6 +33,9 @@ public:
     arm_group_(std::shared_ptr<rclcpp::Node>(this, [](rclcpp::Node*) {}), kArmGroupName),
     gripper_group_(std::shared_ptr<rclcpp::Node>(this, [](rclcpp::Node*) {}), kGripperGroupName)
   {
+    const auto pose_qos = rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable();
+    place_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("debug/place_pose", pose_qos);
+
     configure_moveit(arm_group_, gripper_group_);
 
     cube_pose_client_ =
@@ -64,6 +67,11 @@ private:
   // ======================
   rclcpp::Client<group_6_assignment_2::srv::GetCubePoses>::SharedPtr cube_pose_client_;
   geometry_msgs::msg::Pose reference_cube_pose_;
+
+  // ======================
+  // Debug visualization
+  // ======================
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr place_pose_pub_;
 
   // ======================
   // Parameters
@@ -146,8 +154,12 @@ private:
     */
     //STEP 1 compute goal place pose
     geometry_msgs::msg::Pose place_pose = compute_goal_place_pose(target_table_id);
+    publish_debug_pose(place_pose, place_pose_pub_);
+    RCLCPP_INFO(get_logger(), "Place pose: x=%.3f, y=%.3f, z=%.3f",
+                place_pose.position.x, place_pose.position.y, place_pose.position.z);
 
 
+    /*
     //go home
     feedback->status = "Moving to home position before placing";
     goal_handle->publish_feedback(feedback);
@@ -164,6 +176,7 @@ private:
       return false;
     }
     if (goal_handle->is_canceling()) return false;
+    */
 
 
     //STEP 2 move to pre-place pose
@@ -185,12 +198,11 @@ private:
     }
     if (goal_handle->is_canceling()) return false;
     RCLCPP_INFO(get_logger(), "Place action completed successfully");
-    return true;
-
+    
     // STEP 4 DETATCH OBJECT
     feedback->status = "Detaching object from gripper";
     goal_handle->publish_feedback(feedback);
-    if (!motion_util::detachObject(current_cube_id, arm_group_, get_logger())) {
+    if (!motion_util::detachObject(current_cube_id, gripper_group_, get_logger())) {
       RCLCPP_ERROR(get_logger(), "Failed to detach object from gripper");
       return false;
     }
@@ -210,13 +222,13 @@ private:
   {  
     geometry_msgs::msg::Pose place_pose;
     if (target_table_id == 1) {
-      place_pose.position.x = 3.97 + 0.80;
+      place_pose.position.x = 3.97 + 0.10;
       place_pose.position.y = -1.10;
-      //place_pose.position.z = 0.446 + 0.1;
+      place_pose.position.z = 0.446 + 0.13;
     } else if (target_table_id == 2) {
       place_pose.position.x = 4.56;
-      place_pose.position.y = -0.50 - 0.90;
-      //place_pose.position.z = 0.446 + 0.1;
+      place_pose.position.y = -0.50 - 0.10;
+      place_pose.position.z = 0.446 + 0.13;
     } else {
       RCLCPP_ERROR(get_logger(), "Invalid target_table_id: %d", target_table_id);
     }
@@ -286,6 +298,21 @@ private:
 //       {retreat}, 0.01, 0.15, arm_group_, get_logger());
 //   }
 // 
+
+  void publish_debug_pose(
+    const geometry_msgs::msg::Pose& pose,
+    const rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr& publisher,
+    const std::string& frame_id = "world")
+  {
+    if (!publisher) {
+      return;
+    }
+    geometry_msgs::msg::PoseStamped msg;
+    msg.header.stamp = this->now();
+    msg.header.frame_id = frame_id;
+    msg.pose = pose;
+    publisher->publish(msg);
+  }
 };
 
 }  // namespace place_action_cpp
