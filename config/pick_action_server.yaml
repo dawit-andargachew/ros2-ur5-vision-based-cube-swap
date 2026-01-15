@@ -31,8 +31,8 @@ pick_action_server:
     # For TOP grasp:   x=0.0, y=0.0, z=0.18 (tool length above cube)
     # For SIDE grasp:  x=0.0, y=0.18 (tool length from side), z=0.15 (height offset)
     grasp.offset.x: 0.0
-    grasp.offset.y: 0.0
-    grasp.offset.z: 0.0
+    grasp.offset.y: 0.01 # dawit 
+    grasp.offset.z: 0.18 # prev 14 also works with 0.06 (dawit)
 
     # Pre-grasp Approach Offsets from grasp pose (meters)
     # For TOP grasp:   x=0.0, y=0.0, z=0.20 (approach from above)
@@ -45,8 +45,8 @@ pick_action_server:
     # Usually lift straight up in Z regardless of grasp type
     grasp.lift_offset.x: 0.0
     grasp.lift_offset.y: 0.0
-    grasp.lift_offset.z: 0.10
+    grasp.lift_offset.z: 0.15 #dawit
 
     # Gripper joint targets
     gripper.open: 0.0
-    gripper.closed: 0.10
+    gripper.closed: 0.095
