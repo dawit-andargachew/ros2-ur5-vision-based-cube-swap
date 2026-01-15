@@ -1,6 +1,5 @@
 # Goal
-int32 cube_id
-geometry_msgs/Pose place_pose
+uint8 reference_cube_id
 ---
 # Result
 bool success
