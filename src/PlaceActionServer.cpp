@@ -16,6 +16,7 @@
 #include "group_6_assignment_2/srv/get_cube_poses.hpp"
 #include "group_6_assignment_2/motion_util.hpp"
 #include <tf2/LinearMath/Quaternion.h>
+
 using namespace std::chrono_literals;
 using namespace motion_util;
 
@@ -61,25 +62,19 @@ private:
   // ======================
   moveit::planning_interface::MoveGroupInterface arm_group_;
   moveit::planning_interface::MoveGroupInterface gripper_group_;
-  moveit::planning_interface::PlanningSceneInterface planning_scene_;
+  moveit::planning_interface::PlanningSceneInterface planning_scene_; // useful only if we reintegrate 
+                                                                      // the defensive check at the start,
+                                                                      // pointless otherwise (CANCEL)
 
   // ======================
   // Perception
   // ======================
   rclcpp::Client<group_6_assignment_2::srv::GetCubePoses>::SharedPtr cube_pose_client_;
-  geometry_msgs::msg::Pose reference_cube_pose_;
 
   // ======================
   // Debug visualization
   // ======================
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr place_pose_pub_;
-
-  // ======================
-  // Parameters
-  // ======================
-  const double place_offset_y_ = 0.60;
-  const double pre_place_offset_z_ = 0.20;
-  const double retreat_offset_z_ = 0.20; // hardcoded offset for table placement
 
   // ======================
   // Action callbacks
@@ -137,10 +132,6 @@ private:
   {
 
     auto feedback = std::make_shared<Place::Feedback>();
-
-    /*
-      DEFENSIVE CHECKS
-    */
 
     // check if grabbed_cube_id is attached if not fail and end action
     feedback->status = "Verifying grabbed cube is attached";
@@ -214,24 +205,35 @@ private:
     if (goal_handle->is_canceling()) return false;
     rclcpp::sleep_for(1s); // Brief pause to let physics settle
 
+    // STEP 5 RAISE TO SAFE HEIGHT
+    feedback->status = "Moving up (Cartesian)...";
+    goal_handle->publish_feedback(feedback);
+    if (!move_up_cartesian(-0.10)) // TO THAREN: I COULDN'T FIND THE VALUE WHEN IT GOES DOWN, I GUESS IT'S 0.20?
+    {
+      RCLCPP_ERROR(get_logger(), "Failed to raise to safe height");
+      return false;
+    }
+    if (goal_handle->is_canceling()) return false;
+
+
     // FINISH
     RCLCPP_INFO(get_logger(), "Place action completed successfully");
     return true;
   
   }
 
-  //compute goal pose function returns a pose
-  // for now simple offset depending on the table id
+  // compute goal pose function returns a pose
+  // simple offset depending on the table id
   std::optional<geometry_msgs::msg::Pose> compute_goal_place_pose(
     uint8_t target_table_id)
   {  
     geometry_msgs::msg::Pose place_pose;
     if (target_table_id == 1) {
       place_pose.position.x = 3.97 + 0.10;
-      place_pose.position.y = -1.10;
+      place_pose.position.y = -1.10 - 0.10; //new offset (test also on other machines)
       place_pose.position.z = 0.446 + 0.13;
     } else if (target_table_id == 2) {
-      place_pose.position.x = 4.56;
+      place_pose.position.x = 4.56 + 0.10; //new offset (test also on other machines)
       place_pose.position.y = -0.50 - 0.10;
       place_pose.position.z = 0.446 + 0.13;
     } else {
@@ -253,55 +255,18 @@ private:
 
   }
 
-//   // ======================
-//   // Helpers
-//   // ======================
-//   bool sense_reference_cube(uint8_t cube_id)
-//   {
-//     if (!cube_pose_client_->wait_for_service(5s)) {
-//       RCLCPP_ERROR(get_logger(), "GetCubePoses service unavailable");
-//       return false;
-//     }
+  bool move_up_cartesian(double lift_distance)
+  {
+    std::vector<geometry_msgs::msg::Pose> waypoints;
+    geometry_msgs::msg::Pose lifted_pose = arm_group_.getCurrentPose().pose;
+    lifted_pose.position.z += lift_distance;
+    waypoints.push_back(lifted_pose);
+    motion_util::MotionConfig config;
+    config.cartesian_step_sizes = {0.01};
+    config.min_cartesian_fraction = 0.15;
+    return executeCartesianPath(waypoints, config, arm_group_, get_logger());
+  }
 
-//     auto req = std::make_shared<group_6_assignment_2::srv::GetCubePoses::Request>();
-//     req->target_ids.push_back(static_cast<int32_t>(cube_id));
-
-//     auto future = cube_pose_client_->async_send_request(req);
-//     if (future.wait_for(10s) != std::future_status::ready) {
-//       RCLCPP_ERROR(get_logger(), "Cube pose service timeout");
-//       return false;
-//     }
-
-//     auto res = future.get();
-//     if (!res->success || res->poses.empty()) return false;
-
-//     reference_cube_pose_ = res->poses[0];
-//     return true;
-//   }
-
-//   geometry_msgs::msg::Pose compute_place_pose()
-//   {
-//     geometry_msgs::msg::Pose pose = reference_cube_pose_;
-//     pose.position.y += place_offset_y_;
-//     return pose;
-//   }
-
-//   bool move_to_pre_place(const geometry_msgs::msg::Pose& place_pose)
-//   {
-//     geometry_msgs::msg::Pose pre = place_pose;
-//     pre.position.z += pre_place_offset_z_;
-//     return plan_and_execute_to_pose(pre, arm_group_, get_logger());
-//   }
-
-
-//   bool retreat_from_place(const geometry_msgs::msg::Pose& place_pose)
-//   {
-//     geometry_msgs::msg::Pose retreat = place_pose;
-//     retreat.position.z += retreat_offset_z_;
-//     return executeCartesianPath(
-//       {retreat}, 0.01, 0.15, arm_group_, get_logger());
-//   }
-// 
 
   void publish_debug_pose(
     const geometry_msgs::msg::Pose& pose,
@@ -319,7 +284,7 @@ private:
   }
 };
 
-}  // namespace place_action_cpp
+}
 
 int main(int argc, char** argv)
 {
