@@ -460,7 +460,7 @@ private:
     
     // 1. Detach any attached objects from previous attempt
     auto attached_objects = planning_scene_.getAttachedObjects();
-    //print all attached objects
+    // Print all attached objects.
     RCLCPP_INFO(get_logger(), "Currently attached objects:");
     for (const auto& pair : attached_objects) {
       RCLCPP_INFO(get_logger(), " - %s", pair.first.c_str());
