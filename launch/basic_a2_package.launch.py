@@ -45,6 +45,16 @@ def generate_launch_description():
 		],
 	)
 
+	color_detector_node = Node(
+		package="group_6_assignment_2",
+		executable="color_detector",
+		name="color_detector",
+		output="screen",
+		parameters=[
+			{"use_sim_time": use_sim_time},
+		],
+	)
+
 	pick_action_server_node = Node(
 		package="group_6_assignment_2",
 		executable="pick_action_server",
@@ -88,6 +98,7 @@ def generate_launch_description():
 			),
 			apriltag_launch,
 			cube_detector_node,
+			color_detector_node,
 			pick_action_server_node,
 			place_action_server_node
 		]

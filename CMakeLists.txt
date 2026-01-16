@@ -19,6 +19,9 @@ find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(shape_msgs REQUIRED)
+find_package(cv_bridge REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(OpenCV REQUIRED)
 find_package(rclcpp_action REQUIRED)
 # find_package(ament_cmake_python REQUIRED)
 # Create executable 'pick_action_server' from 'src/PickActionServer.cpp'
@@ -87,6 +90,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/Pick.action"
   "action/Place.action"
   "srv/GetCubePoses.srv"
+  "srv/GetCubeColors.srv"
   DEPENDENCIES geometry_msgs
 )
 
@@ -143,6 +147,17 @@ target_link_libraries(cube_detector ${cpp_typesupport_target})
 
 install(TARGETS 
   cube_detector
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+add_executable(color_detector src/ColorDetector.cpp)
+ament_target_dependencies(color_detector rclcpp cv_bridge sensor_msgs)
+target_link_libraries(color_detector ${OpenCV_LIBRARIES})
+add_dependencies(color_detector ${PROJECT_NAME})
+target_link_libraries(color_detector ${cpp_typesupport_target})
+
+install(TARGETS
+  color_detector
   DESTINATION lib/${PROJECT_NAME}
 )
 
