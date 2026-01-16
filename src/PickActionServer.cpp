@@ -471,7 +471,7 @@ private:
         RCLCPP_ERROR(get_logger(), "Failed to detach cube during cleanup");
         return false;
       }
-      // Verify detachment
+      // Verify planning scene updated after detachment (scene synchronization)
       if (!verify_detached(current_cube_id_)) {
         RCLCPP_ERROR(get_logger(), "Planning scene still shows cube as attached after detach");
         return false;
