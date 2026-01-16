@@ -22,7 +22,10 @@ struct MotionConfig {
     
     // Goal tolerances
     double goal_position_tolerance = 0.015;
-    double goal_orientation_tolerance = 0.010; // was 0.15
+    // Note: orientation tolerance was previously 0.15 rad (~8.6°). It was tightened to 0.010 rad (~0.57°)
+    // to improve end-effector orientation accuracy (e.g., for precise tool alignment). This ~15x reduction
+    // in tolerance can make planning more stringent and may reduce planning success rates in cluttered scenes.
+    double goal_orientation_tolerance = 0.010;
     double goal_joint_tolerance = 0.02;
     
     // Gripper parameters
