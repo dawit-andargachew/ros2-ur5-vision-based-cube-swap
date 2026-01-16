@@ -8,44 +8,6 @@ using namespace std::chrono_literals;
 
 namespace motion_util {
 
-    // void configure_moveit(moveit::planning_interface::MoveGroupInterface& arm_mgi,
-    //                      moveit::planning_interface::MoveGroupInterface& gripper_mgi) {
-    //     arm_mgi.setMaxVelocityScalingFactor(0.5);  // Fixed: was arm_mgi_ (typo)
-    //     arm_mgi.setMaxAccelerationScalingFactor(0.5);
-    //     arm_mgi.setPlanningTime(20.0);
-
-    //     // (void)arm_mgi.getCurrentState(2.0);  // Added: matches MotionInterface.cpp
-    //     // (void)gripper_mgi.getCurrentState(2.0);  // Added: matches MotionInterface.cpp
-    // }
-
-    // In motion_util.cpp, update configure_moveit:
-    // void configure_moveit(moveit::planning_interface::MoveGroupInterface& arm_mgi,
-    //                     moveit::planning_interface::MoveGroupInterface& gripper_mgi) {
-    //     // More balanced settings
-    //     arm_mgi.setMaxVelocityScalingFactor(0.5);  // Increased from 0.3
-    //     arm_mgi.setMaxAccelerationScalingFactor(0.4);
-    //     arm_mgi.setPlanningTime(10.0);  // Reduced from 20.0
-    //     arm_mgi.setNumPlanningAttempts(10);  // Reduced from 50
-        
-    //     // Use relaxed tolerances
-    //     arm_mgi.setGoalPositionTolerance(0.015);  // 1.5cm
-    //     arm_mgi.setGoalOrientationTolerance(0.1);  // ~5.7 degrees
-    //     arm_mgi.setGoalJointTolerance(0.02);
-        
-    //     // // Set a robust planner
-    //     // arm_mgi.setPlannerId("RRTConnect");
-        
-    //     // For Cartesian paths, use:
-    //     arm_mgi.setMaxVelocityScalingFactor(0.3);  // Slower for precision
-    //     arm_mgi.setPlanningTime(15.0);  // Longer for Cartesian
-        
-    //     // Gripper settings
-    //     gripper_mgi.setMaxVelocityScalingFactor(0.8);
-    //     gripper_mgi.setMaxAccelerationScalingFactor(0.8);
-    //     gripper_mgi.setPlanningTime(5.0);
-    //     gripper_mgi.setNumPlanningAttempts(3);
-    // }
-
     void configure_moveit(moveit::planning_interface::MoveGroupInterface& arm_mgi,
                     moveit::planning_interface::MoveGroupInterface& gripper_mgi) {
         // Consistent arm settings - optimized for reliability
@@ -67,6 +29,17 @@ namespace motion_util {
         gripper_mgi.setMaxAccelerationScalingFactor(0.8);
         gripper_mgi.setPlanningTime(5.0);
         gripper_mgi.setNumPlanningAttempts(5);
+
+        // Initialize state monitor for reliable state queries
+        arm_mgi.startStateMonitor(2.0);  
+        gripper_mgi.startStateMonitor(2.0);
+        
+        // Set workspace bounds (Page 3 documentation)
+        arm_mgi.setWorkspace(
+            config.workspace.min_x, config.workspace.min_y, config.workspace.min_z,
+            config.workspace.max_x, config.workspace.max_y, config.workspace.max_z
+        );               
+
     }
 
 
