@@ -261,7 +261,10 @@ private:
     geometry_msgs::msg::Pose lifted_pose = arm_group_.getCurrentPose().pose;
     lifted_pose.position.z += lift_distance;
     waypoints.push_back(lifted_pose);
-    return executeCartesianPath(waypoints, 0.01, 0.15, arm_group_, get_logger());
+    motion_util::MotionConfig config;
+    config.cartesian_step_sizes = {0.01};
+    config.min_cartesian_fraction = 0.15;
+    return executeCartesianPath(waypoints, config, arm_group_, get_logger());
   }
 
 
