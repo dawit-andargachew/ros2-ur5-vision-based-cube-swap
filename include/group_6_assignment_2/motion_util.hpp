@@ -12,8 +12,50 @@
 
 namespace motion_util {
 
+// Forward declare or define MotionConfig before functions that use it
+struct MotionConfig {
+    // Planning parameters
+    double max_velocity_scaling_factor = 0.4;
+    double max_acceleration_scaling_factor = 0.3;
+    double planning_time = 15.0;
+    int num_planning_attempts = 15;
+    
+    // Goal tolerances
+    double goal_position_tolerance = 0.015;
+    // Note: orientation tolerance was previously 0.15 rad (~8.6°). It was tightened to 0.010 rad (~0.57°)
+    // to improve end-effector orientation accuracy (e.g., for precise tool alignment). This ~15x reduction
+    // in tolerance can make planning more stringent and may reduce planning success rates in cluttered scenes.
+    double goal_orientation_tolerance = 0.010;
+    double goal_joint_tolerance = 0.02;
+    
+    // Gripper parameters
+    double gripper_max_velocity_scaling_factor = 0.8;
+    double gripper_max_acceleration_scaling_factor = 0.8;
+    double gripper_goal_joint_tolerance = 0.02;
+    double gripper_planning_time = 5.0;
+    int gripper_num_planning_attempts = 5;
+    
+    // Cartesian path parameters
+    std::vector<double> cartesian_step_sizes = {0.05, 0.03, 0.01};
+    double min_cartesian_fraction = 0.5;
+    // Note: jump_threshold is deprecated in newer MoveIt versions
+    // double jump_threshold = 0.0;  // Deprecated - no longer used
+    
+    // Workspace bounds
+    struct Workspace {
+        double min_x = -0.9, min_y = -0.9, min_z = -0.05;
+        double max_x = 0.9, max_y = 0.9, max_z = 1.1;
+    } workspace;
+    
+    // Replanning
+    bool allow_replanning = true;
+    int replan_attempts = 3;
+    double replan_delay = 2.0;
+};
+
     void configure_moveit(moveit::planning_interface::MoveGroupInterface& arm_mgi,
-                         moveit::planning_interface::MoveGroupInterface& gripper_mgi);
+                         moveit::planning_interface::MoveGroupInterface& gripper_mgi,
+                         const MotionConfig& config);
 
     void apply_path_constraints(moveit::planning_interface::MoveGroupInterface& arm_group_, const rclcpp::Logger& logger);
 
@@ -37,12 +79,13 @@ namespace motion_util {
                             const moveit_msgs::msg::RobotTrajectory& traj,
                             const rclcpp::Logger& logger);
 
-    bool executeCartesianPath(const std::vector<geometry_msgs::msg::Pose>& waypoints,
-                            double eef_step,
-                            double min_fraction,
-                            moveit::planning_interface::MoveGroupInterface& arm_mgi_,
-                            const rclcpp::Logger& logger
-                        );
+    bool executeCartesianPath(
+        const std::vector<geometry_msgs::msg::Pose>& waypoints,
+        const MotionConfig& config,
+        moveit::planning_interface::MoveGroupInterface& arm_mgi,
+        const rclcpp::Logger& logger
+    );
+                       
     bool plan_and_execute_to_pose(const geometry_msgs::msg::Pose& pose,
                                   moveit::planning_interface::MoveGroupInterface& mgi,
                                   const rclcpp::Logger& logger);
@@ -63,12 +106,6 @@ namespace motion_util {
     static constexpr const char* kGripperGroupName = "ir_gripper";  
     static constexpr const char* kActiveJointName = "robotiq_85_left_knuckle_joint";
     static constexpr const char* kWorldFrame = "world";
-    static constexpr double kOpenVal = 0.0;
-    static constexpr double kClosedVal = 0.10;  // tune for collisions
-
-    static constexpr double kGripperLengthOffset = 0.18;
-    static constexpr double kGraspCenterZOffset = -0.02;
-    static constexpr double kPreGraspApproachDist = 0.15;
 } // namespace motion_util
 
 #endif
