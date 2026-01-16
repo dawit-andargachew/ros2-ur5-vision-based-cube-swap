@@ -88,6 +88,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/Pick.action"
   "action/Place.action"
   "srv/GetCubePoses.srv"
+  "srv/GetCubeColors.srv"
   DEPENDENCIES geometry_msgs
 )
 
@@ -150,6 +151,8 @@ install(TARGETS
 add_executable(color_detector src/ColorDetector.cpp)
 ament_target_dependencies(color_detector rclcpp cv_bridge sensor_msgs)
 target_link_libraries(color_detector ${OpenCV_LIBRARIES})
+add_dependencies(color_detector ${PROJECT_NAME})
+target_link_libraries(color_detector ${cpp_typesupport_target})
 
 install(TARGETS
   color_detector
