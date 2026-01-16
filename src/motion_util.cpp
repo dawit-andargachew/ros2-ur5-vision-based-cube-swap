@@ -18,8 +18,8 @@ namespace motion_util {
         arm_mgi.setNumPlanningAttempts(config.num_planning_attempts);  // More attempts
         
         // Relaxed tolerances for higher success rate
-        arm_mgi.setGoalPositionTolerance(config.goal_position_tolerance);  // 2cm
-        arm_mgi.setGoalOrientationTolerance(config.goal_orientation_tolerance);  // ~8.6 degrees
+        arm_mgi.setGoalPositionTolerance(config.goal_position_tolerance);  // 1.5cm
+        arm_mgi.setGoalOrientationTolerance(config.goal_orientation_tolerance);  // ~0.57 degrees
         arm_mgi.setGoalJointTolerance(config.goal_joint_tolerance);
         
         // Use reliable planner
