@@ -49,4 +49,4 @@ pick_action_server:
 
     # Gripper joint targets
     gripper.open: 0.0
-    gripper.closed: 0.095
+    gripper.closed: 0.098 ## works better than 0.095
