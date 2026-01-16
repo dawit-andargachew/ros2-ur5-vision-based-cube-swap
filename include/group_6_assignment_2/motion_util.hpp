@@ -35,7 +35,8 @@ struct MotionConfig {
     // Cartesian path parameters
     std::vector<double> cartesian_step_sizes = {0.05, 0.03, 0.01};
     double min_cartesian_fraction = 0.5;
-    double jump_threshold = 0.0;
+    // Note: jump_threshold is deprecated in newer MoveIt versions
+    // double jump_threshold = 0.0;  // Deprecated - no longer used
     
     // Workspace bounds
     struct Workspace {

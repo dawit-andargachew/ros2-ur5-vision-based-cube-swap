@@ -38,7 +38,7 @@ pick_action_server:
     # For TOP grasp:   x=0.0, y=0.0, z=0.20 (approach from above)
     # For SIDE grasp:  x=0.0, y=0.0, z=0.20 (approach from above, then move sideways)
     grasp.pregrasp_offset.x: 0.0
-    grasp.pregrasp_offset.y: 0.01
+    grasp.pregrasp_offset.y: 0.0
     grasp.pregrasp_offset.z: 0.05
 
     # Lift Motion Offsets from grasp pose (meters)

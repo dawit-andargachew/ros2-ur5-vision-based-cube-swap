@@ -192,11 +192,10 @@ namespace motion_util {
         // Get current constraints (don't clear them!)
         moveit_msgs::msg::Constraints current_constraints = arm_mgi.getPathConstraints();
         
-        // Use constraint-aware version (Page 8, 4th overload)
+        // Use constraint-aware version (without deprecated jump_threshold)
         double fraction = arm_mgi.computeCartesianPath(
             waypoints,
             config.cartesian_step_sizes[0],  // Use configured step size
-            config.jump_threshold,            // Proper jump threshold
             trajectory,
             current_constraints,              // Keep constraints active
             true,                             // avoid_collisions = true
