@@ -22,7 +22,7 @@ ros2 launch group_6_assignment_2 place_action_client.launch.py
 ```
 
 
-### how to run cube color detector (need 3 terminals)
+### How to run cube color detector (need 3 terminals)
 
 ```bash
     ros2 launch ir_launch assignment_2.launch.py
