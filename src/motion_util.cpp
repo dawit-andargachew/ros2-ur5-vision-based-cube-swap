@@ -176,56 +176,35 @@ namespace motion_util {
     }
 
     // In motion_util.cpp, update executeCartesianPath:
-    bool executeCartesianPath(const std::vector<geometry_msgs::msg::Pose>& waypoints,
-                            double eef_step,
-                            double min_fraction,
-                            moveit::planning_interface::MoveGroupInterface& arm_mgi_,
-                            const rclcpp::Logger& logger) {
+    bool executeCartesianPath(
+        const std::vector<geometry_msgs::msg::Pose>& waypoints,
+        const MotionConfig& config,
+        moveit::planning_interface::MoveGroupInterface& arm_mgi,
+        const rclcpp::Logger& logger
+    ) {
+        moveit_msgs::msg::RobotTrajectory trajectory;
         
-        // Temporary relaxation of constraints for Cartesian motion
-        moveit_msgs::msg::Constraints original_constraints = arm_mgi_.getPathConstraints();
-        arm_mgi_.clearPathConstraints();
+        // Get current constraints (don't clear them!)
+        moveit_msgs::msg::Constraints current_constraints = arm_mgi.getPathConstraints();
         
-        // Try multiple times with different step sizes
-        std::vector<double> step_sizes = {0.05, 0.03, 0.01};  // Try coarse first
-        double best_fraction = 0.0;
-        moveit_msgs::msg::RobotTrajectory best_traj;
+        // Use constraint-aware version (Page 8, 4th overload)
+        double fraction = arm_mgi.computeCartesianPath(
+            waypoints,
+            config.cartesian_step_sizes[0],  // Use configured step size
+            config.jump_threshold,            // Proper jump threshold
+            trajectory,
+            current_constraints,              // Keep constraints active
+            true,                             // avoid_collisions = true
+            nullptr                           // error_code (optional)
+        );
         
-        for (double step : step_sizes) {
-            moveit_msgs::msg::RobotTrajectory traj;
-            const double jump_thresh = 0.0;
-            const double fraction = arm_mgi_.computeCartesianPath(waypoints, step, jump_thresh, traj);
-            
-            RCLCPP_INFO(logger, "Cartesian path with step %.3f: %.1f%% computed", 
-                    step, fraction * 100.0);
-            
-            if (fraction > best_fraction) {
-                best_fraction = fraction;
-                best_traj = traj;
-            }
-            
-            if (fraction >= min_fraction) break;
+        if (fraction >= config.min_cartesian_fraction) {
+            return execute_trajectory("Cartesian path", arm_mgi, trajectory, 
+                                    logger, config.arm_controllers);
         }
         
-        // Restore constraints
-        if (!original_constraints.joint_constraints.empty()) {
-            arm_mgi_.setPathConstraints(original_constraints);
-        }
-        
-        if (best_fraction < min_fraction) {
-            RCLCPP_WARN(logger, "Best Cartesian path only %.1f%% (required %.1f%%)", 
-                    best_fraction * 100.0, min_fraction * 100.0);
-            // Try with lower requirement
-            if (best_fraction > 0.5) {  // If we got more than 50%, try executing
-                RCLCPP_INFO(logger, "Attempting to execute partial path (%.1f%%)", 
-                        best_fraction * 100.0);
-                return execute_trajectory("Execute partial Cartesian path", 
-                                        arm_mgi_, best_traj, logger);
-            }
-            return false;
-        }
-        
-        return execute_trajectory("Execute Cartesian path", arm_mgi_, best_traj, logger);
+        RCLCPP_WARN(logger, "Cartesian path only achieved %.1f%%", fraction * 100.0);
+        return false;
     }
 
     bool plan_and_execute_to_pose(const geometry_msgs::msg::Pose& pose,
