@@ -30,7 +30,7 @@ pick_action_server:
     # Grasp Position Offsets from cube center (meters)
     # For TOP grasp:   x=0.0, y=0.0, z=0.18 (tool length above cube)
     # For SIDE grasp:  x=0.0, y=0.18 (tool length from side), z=0.15 (height offset)
-    grasp.offset.x: 0.0
+    grasp.offset.x: 0.0 #-0.01
     grasp.offset.y: 0.0
     grasp.offset.z: 0.18 # prev 14 also works with 0.06 (dawit)
 
@@ -38,7 +38,7 @@ pick_action_server:
     # For TOP grasp:   x=0.0, y=0.0, z=0.20 (approach from above)
     # For SIDE grasp:  x=0.0, y=0.0, z=0.20 (approach from above, then move sideways)
     grasp.pregrasp_offset.x: 0.0
-    grasp.pregrasp_offset.y: 0.01
+    grasp.pregrasp_offset.y: 0.0
     grasp.pregrasp_offset.z: 0.05
 
     # Lift Motion Offsets from grasp pose (meters)
@@ -49,4 +49,4 @@ pick_action_server:
 
     # Gripper joint targets
     gripper.open: 0.0
-    gripper.closed: 0.097
+    gripper.closed: 0.098 ## works better than 0.095

@@ -65,7 +65,20 @@ int main(int argc, char** argv)
 {
   rclcpp::init(argc, argv);
   auto node = std::make_shared<PlaceActionClient>();
-  node->send_goal(1, 2);  // place relative to cube 2
+  
+  // Parse arguments from command-line (defaults: grabbed_cube_id=1, target_table_id=2)
+  uint8_t grabbed_cube_id = 1;
+  uint8_t target_table_id = 2;
+  
+  if (argc > 1) {
+    grabbed_cube_id = static_cast<uint8_t>(std::stoi(argv[1]));
+  }
+  if (argc > 2) {
+    target_table_id = static_cast<uint8_t>(std::stoi(argv[2]));
+  }
+  
+  RCLCPP_INFO(node->get_logger(), "Sending place goal: cube %d to table %d", grabbed_cube_id, target_table_id);
+  node->send_goal(grabbed_cube_id, target_table_id);
   rclcpp::spin(node);
   rclcpp::shutdown();
   return 0;

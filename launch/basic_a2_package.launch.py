@@ -73,13 +73,13 @@ def generate_launch_description():
 	)
 
 	place_action_server_node = Node(
-       package="group_6_assignment_2",
-       executable="place_action_server",
-       name="place_action_server",
-       output="screen",
-       parameters=[
-           {"use_sim_time": use_sim_time},
-           PathJoinSubstitution(
+    	package="group_6_assignment_2",
+       	executable="place_action_server",
+       	name="place_action_server",
+       	output="screen",
+       	parameters=[
+        	{"use_sim_time": use_sim_time},
+			PathJoinSubstitution(
 				[FindPackageShare("group_6_assignment_2"), "config", "pick_action_server.yaml"]
 			),
 			PathJoinSubstitution(

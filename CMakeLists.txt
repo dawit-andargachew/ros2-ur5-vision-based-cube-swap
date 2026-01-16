@@ -32,6 +32,7 @@ ament_target_dependencies(pick_action_server
   moveit_ros_planning_interface
   moveit_core
   moveit_msgs
+  tf2
   geometry_msgs
   shape_msgs
 )
@@ -51,6 +52,7 @@ ament_target_dependencies(place_action_server
   moveit_ros_planning_interface
   moveit_core
   moveit_msgs
+  tf2
   geometry_msgs
   shape_msgs
 )
