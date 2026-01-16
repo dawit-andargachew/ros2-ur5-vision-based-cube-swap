@@ -86,12 +86,12 @@ public:
     feedback->status = "Starting pick sequence";
     goal_handle->publish_feedback(feedback);
 
-
-    // Wait for robot state before starting
-    feedback->status = "Waiting for robot state";
+    // Verify robot state is available (state monitor already started in configure_moveit)
+    feedback->status = "Verifying robot state";
     goal_handle->publish_feedback(feedback);
-    if (!wait_for_robot_state()) {
-      RCLCPP_ERROR(get_logger(), "Failed to get robot state. Check if /joint_states is being published.");
+    auto current_state = arm_group_.getCurrentState(0.5);
+    if (!current_state) {
+      RCLCPP_ERROR(get_logger(), "Failed to get current robot state");
       return false;
     }
     
@@ -414,27 +414,6 @@ private:
                 cube_id, cube_pose_.position.x, cube_pose_.position.y, cube_pose_.position.z);
     
     return true;
-  }
-
-  bool wait_for_robot_state()
-  {
-    int attempts = 0;
-    const int max_attempts = 10;
-    
-    while (rclcpp::ok() && attempts < max_attempts) {
-      auto current_state = arm_group_.getCurrentState(2.0);
-      if (current_state) {
-        RCLCPP_INFO(get_logger(), "Robot state received successfully");
-        return true;
-      }
-      
-      RCLCPP_WARN(get_logger(), "Waiting for robot state (attempt %d/%d)...", attempts + 1, max_attempts);
-      rclcpp::sleep_for(1s);
-      attempts++;
-    }
-    
-    RCLCPP_ERROR(get_logger(), "Failed to get robot state after %d attempts", max_attempts);
-    return false;
   }
 
   bool verify_detached(const std::string& object_id, int max_attempts = 10)
