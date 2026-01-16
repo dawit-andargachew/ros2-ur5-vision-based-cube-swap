@@ -16,6 +16,7 @@
 #include "group_6_assignment_2/srv/get_cube_poses.hpp"
 #include "group_6_assignment_2/motion_util.hpp"
 #include <tf2/LinearMath/Quaternion.h>
+
 using namespace std::chrono_literals;
 using namespace motion_util;
 
@@ -68,19 +69,11 @@ private:
   // Perception
   // ======================
   rclcpp::Client<group_6_assignment_2::srv::GetCubePoses>::SharedPtr cube_pose_client_;
-  geometry_msgs::msg::Pose reference_cube_pose_; // CANCEL
 
   // ======================
   // Debug visualization
   // ======================
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr place_pose_pub_;
-
-  // ======================
-  // Parameters  // CANCEL ALL
-  // ======================
-  const double place_offset_y_ = 0.60;
-  const double pre_place_offset_z_ = 0.20;
-  const double retreat_offset_z_ = 0.20; // hardcoded offset for table placement
 
   // ======================
   // Action callbacks
