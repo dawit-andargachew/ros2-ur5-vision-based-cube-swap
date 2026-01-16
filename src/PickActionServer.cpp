@@ -110,16 +110,16 @@ public:
     // if (!motion_util::move_to_joint_configuration(home_joint_config_, arm_group_, "home", get_logger())) return false;
     // if (goal_handle->is_canceling()) return false;
 
-    //go to active position
-    feedback->status = "Moving to active position";
-    goal_handle->publish_feedback(feedback);
-    if (!motion_util::move_to_joint_configuration(active_joint_config_, arm_group_, "active", get_logger())) return false;
-    if (goal_handle->is_canceling()) return false;
-
     // Clean up scene state from any previous attempts (at home position, safe to detach)
     feedback->status = "Cleaning up scene state";
     goal_handle->publish_feedback(feedback);
     if (!cleanup_scene()) return false;
+    if (goal_handle->is_canceling()) return false;
+
+    //go to active position
+    feedback->status = "Moving to active position";
+    goal_handle->publish_feedback(feedback);
+    if (!motion_util::move_to_joint_configuration(active_joint_config_, arm_group_, "active", get_logger())) return false;
     if (goal_handle->is_canceling()) return false;
 
     feedback->status = "Setting up planning scene";
@@ -153,7 +153,7 @@ public:
 
     feedback->status = "Attaching object to gripper";
     goal_handle->publish_feedback(feedback);
-    if (!attach_object()) return false;
+    if (!attachObject(current_cube_id_, arm_group_, get_logger())) return false;
     if (goal_handle->is_canceling()) return false;
 
     feedback->status = "Closing gripper after attaching object";
@@ -458,22 +458,36 @@ private:
   {
     RCLCPP_INFO(get_logger(), "Cleaning up scene state from previous attempts...");
     
-    // Check if the target cube is attached from a previous attempt
+    // 1. Detach any attached objects from previous attempt
     auto attached_objects = planning_scene_.getAttachedObjects();
+    //print all attached objects
+    RCLCPP_INFO(get_logger(), "Currently attached objects:");
+    for (const auto& pair : attached_objects) {
+      RCLCPP_INFO(get_logger(), " - %s", pair.first.c_str());
+    }
     if (attached_objects.find(current_cube_id_) != attached_objects.end()) {
       RCLCPP_WARN(get_logger(), "Cube '%s' is attached from previous attempt, detaching...", current_cube_id_.c_str());
       if (!motion_util::detachObject(current_cube_id_, arm_group_, get_logger())) {
         RCLCPP_ERROR(get_logger(), "Failed to detach cube during cleanup");
         return false;
       }
-      // Verify planning scene updated (scene synchronization)
+      // Verify detachment
       if (!verify_detached(current_cube_id_)) {
         RCLCPP_ERROR(get_logger(), "Planning scene still shows cube as attached after detach");
         return false;
       }
     }
     
-    // Ensure gripper is open (in case it was closed from previous attempt)
+    // 2. Remove old cube collision object if it exists
+    auto existing_objects = planning_scene_.getKnownObjectNames();
+    if (std::find(existing_objects.begin(), existing_objects.end(), current_cube_id_) != existing_objects.end()) {
+      RCLCPP_INFO(get_logger(), "Removing old cube collision object '%s'...", current_cube_id_.c_str());
+      std::vector<std::string> to_remove = {current_cube_id_};
+      planning_scene_.removeCollisionObjects(to_remove);
+      rclcpp::sleep_for(200ms);
+    }
+    
+    // 3. Ensure gripper is open
     RCLCPP_INFO(get_logger(), "Ensuring gripper is open...");
     if (!open_gripper()) {
       RCLCPP_ERROR(get_logger(), "Failed to open gripper during cleanup");
@@ -486,57 +500,45 @@ private:
 
   bool setup_scene()
   {
-    // Defensive check: ensure cube is detached before updating scene
-    auto attached_objects = planning_scene_.getAttachedObjects();
-    if (attached_objects.find(current_cube_id_) != attached_objects.end()) {
-      RCLCPP_WARN(get_logger(), "Cube '%s' still attached, detaching before scene update...", current_cube_id_.c_str());
-      motion_util::detachObject(current_cube_id_, arm_group_, get_logger());
-      rclcpp::sleep_for(500ms);
-    }
+    RCLCPP_INFO(get_logger(), "Setting up planning scene with fresh sensed data...");
     
-    // Check if scene objects already exist (for repeated calls)
+    // Check if scene objects already exist
     auto existing_objects = planning_scene_.getKnownObjectNames();
     bool tables_exist = std::find(existing_objects.begin(), existing_objects.end(), "table_1") != existing_objects.end();
-    bool cube_exists = std::find(existing_objects.begin(), existing_objects.end(), current_cube_id_) != existing_objects.end();
 
-    // Add static tables (only needs to be added once)
+    // 1. Add static tables (only needs to be added once per session)
     if (!tables_exist) {
       if (!motion_util::setup_scene(planning_scene_)) {
+        RCLCPP_ERROR(get_logger(), "Failed to add tables to scene");
         return false;
       }
       RCLCPP_INFO(get_logger(), "Tables added to scene");
     }
 
-    // Add or update cube using ONLY sensed position (sense->plan->act)
-    if (!cube_exists) {
-      // First time: add cube collision object with sensed pose
-      moveit_msgs::msg::CollisionObject cube;
-      cube.header.frame_id = kWorldFrame;
-      cube.id = current_cube_id_;
+    // 2. Add cube collision object using fresh sensed pose
+    // (cleanup_scene already removed old cube collision object)
+    moveit_msgs::msg::CollisionObject cube;
+    cube.header.frame_id = kWorldFrame;
+    cube.id = current_cube_id_;
 
-      shape_msgs::msg::SolidPrimitive cube_prim;
-      cube_prim.type = shape_msgs::msg::SolidPrimitive::BOX;
-      cube_prim.dimensions = {params_.cube_width, params_.cube_depth, params_.cube_height};
+    shape_msgs::msg::SolidPrimitive cube_prim;
+    cube_prim.type = shape_msgs::msg::SolidPrimitive::BOX;
+    cube_prim.dimensions = {params_.cube_width, params_.cube_depth, params_.cube_height};
 
-      cube.primitives.push_back(cube_prim);
-      cube.primitive_poses.push_back(cube_pose_);  // Use sensed pose
-      cube.operation = moveit_msgs::msg::CollisionObject::ADD;
+    cube.primitives.push_back(cube_prim);
+    cube.primitive_poses.push_back(cube_pose_);  // Use fresh sensed pose
+    cube.operation = moveit_msgs::msg::CollisionObject::ADD;
 
-      planning_scene_.applyCollisionObject(cube);
-      RCLCPP_INFO(get_logger(), "Cube added to scene at sensed position");
-    } else {
-      // Subsequent times: move cube to updated sensed position
-      motion_util::moveCollisionObject(current_cube_id_, cube_pose_, kWorldFrame, planning_scene_);
-      RCLCPP_INFO(get_logger(), "Cube position updated to sensed position");
-    }
+    planning_scene_.applyCollisionObject(cube);
+    RCLCPP_INFO(get_logger(), "Cube added to scene at sensed position");
 
-    // Precompute grasp pose (uses sensed cube_pose_)
+    // 3. Compute grasp pose from sensed cube position
     grasp_pose_ = compute_grasp_pose(cube_pose_);
     publish_debug_pose(grasp_pose_, grasp_pose_pub_, kWorldFrame);
     
     RCLCPP_INFO(get_logger(), "Cube pose (sensed): x=%.3f, y=%.3f, z=%.3f", 
                 cube_pose_.position.x, cube_pose_.position.y, cube_pose_.position.z);
-    RCLCPP_INFO(get_logger(), "Grasp pose: x=%.3f, y=%.3f, z=%.3f", 
+    RCLCPP_INFO(get_logger(), "Grasp pose (computed): x=%.3f, y=%.3f, z=%.3f", 
                 grasp_pose_.position.x, grasp_pose_.position.y, grasp_pose_.position.z);
     
     return true;
@@ -624,12 +626,6 @@ private:
     }
     
     return result;
-  }
-
-  bool attach_object()
-  {
-    RCLCPP_INFO(get_logger(), "Attaching '%s' to end effector...", current_cube_id_.c_str());
-    return attachObject(current_cube_id_, arm_group_, get_logger());
   }
 
   bool lift_up_cartesian()

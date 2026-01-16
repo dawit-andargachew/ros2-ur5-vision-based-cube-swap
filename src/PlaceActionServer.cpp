@@ -207,7 +207,7 @@ private:
     // STEP 4 DETACH OBJECT
     feedback->status = "Detaching object from gripper";
     goal_handle->publish_feedback(feedback);
-    if (!motion_util::detachObject(current_cube_id, gripper_group_, get_logger())) {
+    if (!motion_util::detachObject(current_cube_id, arm_group_, get_logger())) {
       RCLCPP_ERROR(get_logger(), "Failed to detach object from gripper");
       return false;
     }

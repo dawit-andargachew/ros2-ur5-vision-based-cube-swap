@@ -21,9 +21,9 @@ struct MotionConfig {
     int num_planning_attempts = 15;
     
     // Goal tolerances
-    double goal_position_tolerance = 0.02;
-    double goal_orientation_tolerance = 0.15;
-    double goal_joint_tolerance = 0.03;
+    double goal_position_tolerance = 0.015;
+    double goal_orientation_tolerance = 0.010; // was 0.15
+    double goal_joint_tolerance = 0.02;
     
     // Gripper parameters
     double gripper_max_velocity_scaling_factor = 0.8;
