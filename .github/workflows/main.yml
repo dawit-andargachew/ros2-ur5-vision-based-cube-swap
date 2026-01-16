@@ -20,7 +20,7 @@ jobs:
           path: ros_ws/src/group_6_assignment_2
 
       # 2. Setup ROS 2 Jazzy environment 
-      - uses: ros-tooling/setup-ros@v0.7
+      - uses: ros-tooling/setup-ros@v0.8
         with:
           required-ros-distributions: ${{ matrix.ros_distro }}
 
