@@ -15,7 +15,7 @@
 #include "group_6_assignment_2/action/place.hpp"
 #include "group_6_assignment_2/srv/get_cube_poses.hpp"
 #include "group_6_assignment_2/motion_util.hpp"
-
+#include <tf2/LinearMath/Quaternion.h>
 using namespace std::chrono_literals;
 using namespace motion_util;
 
@@ -153,7 +153,12 @@ private:
     }
     */
     //STEP 1 compute goal place pose
-    geometry_msgs::msg::Pose place_pose = compute_goal_place_pose(target_table_id);
+    std::optional<geometry_msgs::msg::Pose> place_pose_opt = compute_goal_place_pose(target_table_id);
+    if (!place_pose_opt) {
+      RCLCPP_ERROR(get_logger(), "Failed to compute goal place pose. Check target_table_id validity");
+      return false;
+    }
+    geometry_msgs::msg::Pose place_pose = *place_pose_opt;
     publish_debug_pose(place_pose, place_pose_pub_);
     RCLCPP_INFO(get_logger(), "Place pose: x=%.3f, y=%.3f, z=%.3f",
                 place_pose.position.x, place_pose.position.y, place_pose.position.z);
@@ -197,9 +202,8 @@ private:
       return false;
     }
     if (goal_handle->is_canceling()) return false;
-    RCLCPP_INFO(get_logger(), "Place action completed successfully");
-    
-    // STEP 4 DETATCH OBJECT
+   
+    // STEP 4 DETACH OBJECT
     feedback->status = "Detaching object from gripper";
     goal_handle->publish_feedback(feedback);
     if (!motion_util::detachObject(current_cube_id, gripper_group_, get_logger())) {
@@ -217,7 +221,7 @@ private:
 
   //compute goal pose function returns a pose
   // for now simple offset depending on the table id
-   geometry_msgs::msg::Pose compute_goal_place_pose(
+  std::optional<geometry_msgs::msg::Pose> compute_goal_place_pose(
     uint8_t target_table_id)
   {  
     geometry_msgs::msg::Pose place_pose;
@@ -231,13 +235,12 @@ private:
       place_pose.position.z = 0.446 + 0.13;
     } else {
       RCLCPP_ERROR(get_logger(), "Invalid target_table_id: %d", target_table_id);
+      return std::nullopt;
     }
 
     // set quaternion via RPY
-     tf2::Quaternion q;
-    q.setRPY(0.0, 
-             3.1415, 
-             0.0);
+    tf2::Quaternion q;
+    q.setRPY(0.0, M_PI, 0.0);
     q.normalize();
 
     place_pose.orientation.x = q.x();
