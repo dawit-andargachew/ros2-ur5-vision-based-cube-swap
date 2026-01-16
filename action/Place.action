@@ -1,0 +1,9 @@
+# Goal
+uint8 grabbed_cube_id
+uint8 target_table_id
+---
+# Result
+bool success
+---
+# Feedback
+string status

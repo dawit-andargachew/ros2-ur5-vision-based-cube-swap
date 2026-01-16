@@ -29,6 +29,7 @@ ament_target_dependencies(pick_action_server
   moveit_ros_planning_interface
   moveit_core
   moveit_msgs
+  tf2
   geometry_msgs
   shape_msgs
 )
@@ -38,6 +39,27 @@ add_executable(pick_action_client src/PickActionClient.cpp)
 ament_target_dependencies(pick_action_client
   rclcpp
   rclcpp_action
+)
+
+add_executable(place_action_server src/PlaceActionServer.cpp)
+# Link necessary libraries
+ament_target_dependencies(place_action_server
+  rclcpp
+  rclcpp_action
+  moveit_ros_planning_interface
+  moveit_core
+  moveit_msgs
+  tf2
+  geometry_msgs
+  shape_msgs
+)
+
+add_executable(place_action_client src/PlaceActionClient.cpp)
+ament_target_dependencies(place_action_client
+  rclcpp
+  rclcpp_action
+  geometry_msgs
+  tf2
 )
 
 # Add the motion_util library
@@ -59,19 +81,25 @@ target_include_directories(motion_util_lib PUBLIC
 
 # Link the library to the pick executable
 target_link_libraries(pick_action_server motion_util_lib)
+target_link_libraries(place_action_server motion_util_lib)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "action/Pick.action"
+  "action/Place.action"
   "srv/GetCubePoses.srv"
   DEPENDENCIES geometry_msgs
 )
 
 add_dependencies(pick_action_server ${PROJECT_NAME})
 add_dependencies(pick_action_client ${PROJECT_NAME})
+add_dependencies(place_action_server ${PROJECT_NAME})
+add_dependencies(place_action_client ${PROJECT_NAME})
 
 install(TARGETS
   pick_action_server
   pick_action_client
+  place_action_server
+  place_action_client
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -109,6 +137,8 @@ rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typ
 
 target_link_libraries(pick_action_server ${cpp_typesupport_target})
 target_link_libraries(pick_action_client ${cpp_typesupport_target})
+target_link_libraries(place_action_server ${cpp_typesupport_target})
+target_link_libraries(place_action_client ${cpp_typesupport_target})
 target_link_libraries(cube_detector ${cpp_typesupport_target})
 
 install(TARGETS 

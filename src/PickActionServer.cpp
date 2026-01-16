@@ -78,6 +78,8 @@ public:
 
   bool run_pick_sequence(uint8_t cube_id, const std::shared_ptr<GoalHandlePick> goal_handle)
   {
+    // Set the current cube ID for this pick sequence
+    current_cube_id_ = "cube_" + std::to_string(cube_id);
 
     auto feedback = std::make_shared<Pick::Feedback>();
     feedback->status = "Starting pick sequence";
@@ -121,13 +123,13 @@ public:
 
     feedback->status = "Setting up planning scene";
     goal_handle->publish_feedback(feedback);
-    if (!setup_scene()) return false;
+    if (!PickActionServer::setup_scene()) return false;
     if (goal_handle->is_canceling()) return false;
     
     // Wait for planning scene to update with collision objects
     feedback->status = "Waiting for scene synchronization";
     goal_handle->publish_feedback(feedback);
-    std::vector<std::string> expected_objects = {kTableId, kCubeId};
+    std::vector<std::string> expected_objects = {"table_1", "table_2", current_cube_id_};
     if (!wait_for_scene_update(expected_objects)) {
       RCLCPP_ERROR(get_logger(), "Planning scene did not update in time");
       return false;
@@ -148,14 +150,14 @@ public:
     if (!move_to_grasp_cartesian()) return false;
     if (goal_handle->is_canceling()) return false;
 
-    feedback->status = "Closing gripper and attaching object";
-    goal_handle->publish_feedback(feedback);
-    if (!close_gripper()) return false;
-    if (goal_handle->is_canceling()) return false;
-
     feedback->status = "Attaching object to gripper";
     goal_handle->publish_feedback(feedback);
     if (!attach_object()) return false;
+    if (goal_handle->is_canceling()) return false;
+
+    feedback->status = "Closing gripper after attaching object";
+    goal_handle->publish_feedback(feedback);
+    if (!close_gripper()) return false;
     if (goal_handle->is_canceling()) return false;
 
     feedback->status = "Lifting object";
@@ -183,6 +185,7 @@ private:
 
   geometry_msgs::msg::Pose cube_pose_{};
   geometry_msgs::msg::Pose grasp_pose_{};
+  std::string current_cube_id_;  // Dynamic cube ID based on action request
 
   std::map<std::string, double> home_joint_config_;
   std::map<std::string, double> active_joint_config_;
@@ -477,14 +480,14 @@ private:
     
     // Check if the target cube is attached from a previous attempt
     auto attached_objects = planning_scene_.getAttachedObjects();
-    if (attached_objects.find(kCubeId) != attached_objects.end()) {
-      RCLCPP_WARN(get_logger(), "Cube '%s' is attached from previous attempt, detaching...", kCubeId);
-      if (!motion_util::detachObject(kCubeId, arm_group_, get_logger())) {
+    if (attached_objects.find(current_cube_id_) != attached_objects.end()) {
+      RCLCPP_WARN(get_logger(), "Cube '%s' is attached from previous attempt, detaching...", current_cube_id_.c_str());
+      if (!motion_util::detachObject(current_cube_id_, arm_group_, get_logger())) {
         RCLCPP_ERROR(get_logger(), "Failed to detach cube during cleanup");
         return false;
       }
       // Verify planning scene updated (scene synchronization)
-      if (!verify_detached(kCubeId)) {
+      if (!verify_detached(current_cube_id_)) {
         RCLCPP_ERROR(get_logger(), "Planning scene still shows cube as attached after detach");
         return false;
       }
@@ -505,23 +508,23 @@ private:
   {
     // Defensive check: ensure cube is detached before updating scene
     auto attached_objects = planning_scene_.getAttachedObjects();
-    if (attached_objects.find(kCubeId) != attached_objects.end()) {
-      RCLCPP_WARN(get_logger(), "Cube '%s' still attached, detaching before scene update...", kCubeId);
-      motion_util::detachObject(kCubeId, arm_group_, get_logger());
+    if (attached_objects.find(current_cube_id_) != attached_objects.end()) {
+      RCLCPP_WARN(get_logger(), "Cube '%s' still attached, detaching before scene update...", current_cube_id_.c_str());
+      motion_util::detachObject(current_cube_id_, arm_group_, get_logger());
       rclcpp::sleep_for(500ms);
     }
     
     // Check if scene objects already exist (for repeated calls)
     auto existing_objects = planning_scene_.getKnownObjectNames();
-    bool table_exists = std::find(existing_objects.begin(), existing_objects.end(), kTableId) != existing_objects.end();
-    bool cube_exists = std::find(existing_objects.begin(), existing_objects.end(), kCubeId) != existing_objects.end();
+    bool tables_exist = std::find(existing_objects.begin(), existing_objects.end(), "table_1") != existing_objects.end();
+    bool cube_exists = std::find(existing_objects.begin(), existing_objects.end(), current_cube_id_) != existing_objects.end();
 
-    // Add table (static, only needs to be added once)
-    if (!table_exists) {
+    // Add static tables (only needs to be added once)
+    if (!tables_exist) {
       if (!motion_util::setup_scene(planning_scene_)) {
         return false;
       }
-      RCLCPP_INFO(get_logger(), "Table added to scene");
+      RCLCPP_INFO(get_logger(), "Tables added to scene");
     }
 
     // Add or update cube using ONLY sensed position (sense->plan->act)
@@ -529,7 +532,7 @@ private:
       // First time: add cube collision object with sensed pose
       moveit_msgs::msg::CollisionObject cube;
       cube.header.frame_id = kWorldFrame;
-      cube.id = kCubeId;
+      cube.id = current_cube_id_;
 
       shape_msgs::msg::SolidPrimitive cube_prim;
       cube_prim.type = shape_msgs::msg::SolidPrimitive::BOX;
@@ -543,7 +546,7 @@ private:
       RCLCPP_INFO(get_logger(), "Cube added to scene at sensed position");
     } else {
       // Subsequent times: move cube to updated sensed position
-      motion_util::moveCollisionObject(kCubeId, cube_pose_, kWorldFrame, planning_scene_);
+      motion_util::moveCollisionObject(current_cube_id_, cube_pose_, kWorldFrame, planning_scene_);
       RCLCPP_INFO(get_logger(), "Cube position updated to sensed position");
     }
 
@@ -643,8 +646,8 @@ private:
 
   bool attach_object()
   {
-    RCLCPP_INFO(get_logger(), "Attaching '%s' to end effector...", kCubeId);
-    return attachObject(kCubeId, arm_group_, get_logger());
+    RCLCPP_INFO(get_logger(), "Attaching '%s' to end effector...", current_cube_id_.c_str());
+    return attachObject(current_cube_id_, arm_group_, get_logger());
   }
 
   bool lift_up_cartesian()
