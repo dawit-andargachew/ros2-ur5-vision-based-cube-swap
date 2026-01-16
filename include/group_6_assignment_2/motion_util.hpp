@@ -12,8 +12,39 @@
 
 namespace motion_util {
 
+// Forward declare or define MotionConfig before functions that use it
+struct MotionConfig {
+    // Planning parameters
+    double max_velocity_scaling_factor = 0.4;
+    double max_acceleration_scaling_factor = 0.3;
+    double planning_time = 15.0;
+    int num_planning_attempts = 15;
+    
+    // Goal tolerances
+    double goal_position_tolerance = 0.02;
+    double goal_orientation_tolerance = 0.15;
+    double goal_joint_tolerance = 0.03;
+    
+    // Cartesian path parameters
+    std::vector<double> cartesian_step_sizes = {0.05, 0.03, 0.01};
+    double min_cartesian_fraction = 0.5;
+    double jump_threshold = 0.0;
+    
+    // Workspace bounds
+    struct Workspace {
+        double min_x = -10.0, min_y = -10.0, min_z = 0.0;
+        double max_x = 10.0, max_y = 10.0, max_z = 10.0;
+    } workspace;
+    
+    // Replanning
+    bool allow_replanning = true;
+    int replan_attempts = 3;
+    double replan_delay = 2.0;
+};
+
     void configure_moveit(moveit::planning_interface::MoveGroupInterface& arm_mgi,
-                         moveit::planning_interface::MoveGroupInterface& gripper_mgi);
+                         moveit::planning_interface::MoveGroupInterface& gripper_mgi,
+                         const MotionConfig& config);
 
     void apply_path_constraints(moveit::planning_interface::MoveGroupInterface& arm_group_, const rclcpp::Logger& logger);
 
@@ -64,46 +95,6 @@ namespace motion_util {
     static constexpr const char* kGripperGroupName = "ir_gripper";  
     static constexpr const char* kActiveJointName = "robotiq_85_left_knuckle_joint";
     static constexpr const char* kWorldFrame = "world";
-    static constexpr double kOpenVal = 0.0;
-    static constexpr double kClosedVal = 0.10;  // tune for collisions
-
-    static constexpr double kGripperLengthOffset = 0.18;
-    static constexpr double kGraspCenterZOffset = -0.02;
-    static constexpr double kPreGraspApproachDist = 0.15;
-
-struct MotionConfig {
-    // Planning parameters
-    double max_velocity_scaling_factor = 0.4;
-    double max_acceleration_scaling_factor = 0.3;
-    double planning_time = 15.0;
-    int num_planning_attempts = 15;
-    
-    // Goal tolerances
-    double goal_position_tolerance = 0.02;
-    double goal_orientation_tolerance = 0.15;
-    double goal_joint_tolerance = 0.03;
-    
-    // Cartesian path parameters
-    std::vector<double> cartesian_step_sizes = {0.05, 0.03, 0.01};
-    double min_cartesian_fraction = 0.5;
-    double jump_threshold = 0.0;
-    
-    // Workspace bounds
-    struct Workspace {
-        double min_x = -1.0, min_y = -1.0, min_z = 0.0;
-        double max_x = 1.0, max_y = 1.0, max_z = 2.0;
-    } workspace;
-    
-    // Controller names
-    std::vector<std::string> arm_controllers = {"arm_controller"};
-    std::vector<std::string> gripper_controllers = {"gripper_controller"};
-    
-    // Replanning
-    bool allow_replanning = true;
-    int replan_attempts = 3;
-    double replan_delay = 2.0;
-};
-
 } // namespace motion_util
 
 #endif

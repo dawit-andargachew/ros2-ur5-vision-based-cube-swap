@@ -9,19 +9,21 @@ using namespace std::chrono_literals;
 namespace motion_util {
 
     void configure_moveit(moveit::planning_interface::MoveGroupInterface& arm_mgi,
-                    moveit::planning_interface::MoveGroupInterface& gripper_mgi) {
+                    moveit::planning_interface::MoveGroupInterface& gripper_mgi,
+                    const MotionConfig& config) {
         // Consistent arm settings - optimized for reliability
-        arm_mgi.setMaxVelocityScalingFactor(0.4);  // Moderate speed
-        arm_mgi.setMaxAccelerationScalingFactor(0.3);  // Smooth acceleration
-        arm_mgi.setPlanningTime(15.0);  // More time for complex plans
-        arm_mgi.setNumPlanningAttempts(15);  // More attempts
+        arm_mgi.setMaxVelocityScalingFactor(config.max_velocity_scaling_factor);  // Moderate speed
+        arm_mgi.setMaxAccelerationScalingFactor(config.max_acceleration_scaling_factor);  // Smooth acceleration
+        arm_mgi.setPlanningTime(config.planning_time);  // More time for complex plans
+        arm_mgi.setNumPlanningAttempts(config.num_planning_attempts);  // More attempts
         
         // Relaxed tolerances for higher success rate
-        arm_mgi.setGoalPositionTolerance(0.02);  // 2cm
-        arm_mgi.setGoalOrientationTolerance(0.15);  // ~8.6 degrees
-        arm_mgi.setGoalJointTolerance(0.03);
+        arm_mgi.setGoalPositionTolerance(config.goal_position_tolerance);  // 2cm
+        arm_mgi.setGoalOrientationTolerance(config.goal_orientation_tolerance);  // ~8.6 degrees
+        arm_mgi.setGoalJointTolerance(config.goal_joint_tolerance);
         
         // Use reliable planner
+        arm_mgi.setPlanningPipelineId("ompl");
         arm_mgi.setPlannerId("RRTConnect");
         
         // Gripper settings
@@ -200,7 +202,7 @@ namespace motion_util {
         
         if (fraction >= config.min_cartesian_fraction) {
             return execute_trajectory("Cartesian path", arm_mgi, trajectory, 
-                                    logger, config.arm_controllers);
+                                    logger);
         }
         
         RCLCPP_WARN(logger, "Cartesian path only achieved %.1f%%", fraction * 100.0);

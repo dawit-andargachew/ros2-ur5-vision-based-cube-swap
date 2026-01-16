@@ -52,7 +52,8 @@ public:
       std::bind(&PickActionServer::handle_cancel, this, std::placeholders::_1),
       std::bind(&PickActionServer::handle_accepted, this, std::placeholders::_1));
 
-    configure_moveit(arm_group_, gripper_group_);  // Updated: Use motion_util::configure_moveit
+    MotionConfig config;  // Use default configuration
+    configure_moveit(arm_group_, gripper_group_, config);
     //apply_path_constraints(arm_group_, get_logger());  // ADDED: Apply path constraints
 
     // Create service client for cube pose detection
@@ -621,8 +622,10 @@ private:
     RCLCPP_INFO(get_logger(), "Approaching object (Cartesian)...");
     std::vector<geometry_msgs::msg::Pose> waypoints;
     waypoints.push_back(grasp_pose_);
-    const double eef_step = 0.01;
-    return executeCartesianPath(waypoints, eef_step, 0.15, arm_group_, get_logger());
+    MotionConfig config;
+    config.cartesian_step_sizes = {0.01};
+    config.min_cartesian_fraction = 0.5;
+    return executeCartesianPath(waypoints, config, arm_group_, get_logger());
   }
 
   bool move_to_grasp_non_cartesian()
@@ -662,7 +665,10 @@ private:
 
     std::vector<geometry_msgs::msg::Pose> waypoints;
     waypoints.push_back(lift_pose);
-    return executeCartesianPath(waypoints, 0.01, 0.15, arm_group_, get_logger());
+    MotionConfig config;
+    config.cartesian_step_sizes = {0.01};
+    config.min_cartesian_fraction = 0.5;
+    return executeCartesianPath(waypoints, config, arm_group_, get_logger());
   }
 
   bool lift_up_non_cartesian()

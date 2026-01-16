@@ -36,7 +36,8 @@ public:
     const auto pose_qos = rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable();
     place_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("debug/place_pose", pose_qos);
 
-    configure_moveit(arm_group_, gripper_group_);
+    MotionConfig config;  // Use default configuration
+    configure_moveit(arm_group_, gripper_group_, config);
 
     cube_pose_client_ =
       this->create_client<group_6_assignment_2::srv::GetCubePoses>("get_cube_poses");
