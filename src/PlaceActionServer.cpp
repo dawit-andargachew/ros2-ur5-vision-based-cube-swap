@@ -208,7 +208,7 @@ private:
     // STEP 5 RAISE TO SAFE HEIGHT
     feedback->status = "Moving up (Cartesian)...";
     goal_handle->publish_feedback(feedback);
-    if (!move_up_cartesian(-0.10)) // TO THAREN: I COULDN'T FIND THE VALUE WHEN I GOES DOWN, I GUESS IT'S 0.20?
+    if (!move_up_cartesian(-0.10)) // TO THAREN: I COULDN'T FIND THE VALUE WHEN IT GOES DOWN, I GUESS IT'S 0.20?
     {
       RCLCPP_ERROR(get_logger(), "Failed to raise to safe height");
       return false;
