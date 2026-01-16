@@ -204,7 +204,16 @@ private:
     if (goal_handle->is_canceling()) return false;
     rclcpp::sleep_for(1s); // Brief pause to let physics settle
 
-    // STEP 5 RISE TO SAFE HEIGHT
+    // STEP 5 RAISE TO SAFE HEIGHT
+    feedback->status = "Moving up (Cartesian)...";
+    goal_handle->publish_feedback(feedback);
+    if (!move_up_cartesian(-0.10)) // TO THAREN: I COULDN'T FIND THE VALUE WHEN I GOES DOWN, I GUESS IT'S 0.20?
+    {
+      RCLCPP_ERROR(get_logger(), "Failed to raise to safe height");
+      return false;
+    }
+    if (goal_handle->is_canceling()) return false;
+
 
     // FINISH
     RCLCPP_INFO(get_logger(), "Place action completed successfully");
@@ -245,14 +254,15 @@ private:
 
   }
 
-//   bool retreat_from_place(const geometry_msgs::msg::Pose& place_pose)
-//   {
-//     geometry_msgs::msg::Pose retreat = place_pose;
-//     retreat.position.z += retreat_offset_z_;
-//     return executeCartesianPath(
-//       {retreat}, 0.01, 0.15, arm_group_, get_logger());
-//   }
-// 
+  bool move_up_cartesian(double lift_distance)
+  {
+    std::vector<geometry_msgs::msg::Pose> waypoints;
+    geometry_msgs::msg::Pose lifted_pose = arm_group_.getCurrentPose().pose;
+    lifted_pose.position.z += lift_distance;
+    waypoints.push_back(lifted_pose);
+    return executeCartesianPath(waypoints, 0.01, 0.15, arm_group_, get_logger());
+  }
+
 
   void publish_debug_pose(
     const geometry_msgs::msg::Pose& pose,
