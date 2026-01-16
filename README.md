@@ -13,11 +13,11 @@ This repository contains the code for **Assignment 2** of the *Intelligent Robot
 After cloning the repository, navigate to your ROS2 workspace and run:
 
 ```bash
-ros2 launch ir_launch assignment_2.launch.py
-ros2 run group_6_assignment_2 pick
-colcon build --packages-select group_6_assignment_2
-
 three terminals to test pick
+
 ros2 launch ir_launch assignment_2.launch.py
 ros2 launch group_6_assignment_2 basic_a2_package.launch.py
 ros2 launch group_6_assignment_2 pick_action_client.launch.py
+
+
+ros2 launch group_6_assignment_2 place_action_client.launch.py
