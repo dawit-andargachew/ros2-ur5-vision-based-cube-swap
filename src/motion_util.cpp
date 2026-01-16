@@ -34,7 +34,7 @@ namespace motion_util {
         gripper_mgi.setMaxAccelerationScalingFactor(config.gripper_max_acceleration_scaling_factor);
         gripper_mgi.setPlanningTime(config.gripper_planning_time);
         gripper_mgi.setNumPlanningAttempts(config.gripper_num_planning_attempts);
-
+        gripper_mgi.setGoalJointTolerance(config.gripper_goal_joint_tolerance); // hopefully wont fail as much
         // Initialize state monitor for reliable state queries
         arm_mgi.startStateMonitor(2.0);  
         gripper_mgi.startStateMonitor(2.0);

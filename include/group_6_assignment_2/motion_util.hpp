@@ -28,6 +28,7 @@ struct MotionConfig {
     // Gripper parameters
     double gripper_max_velocity_scaling_factor = 0.8;
     double gripper_max_acceleration_scaling_factor = 0.8;
+    double gripper_goal_joint_tolerance = 0.02;
     double gripper_planning_time = 5.0;
     int gripper_num_planning_attempts = 5;
     
@@ -38,8 +39,8 @@ struct MotionConfig {
     
     // Workspace bounds
     struct Workspace {
-        double min_x = -10.0, min_y = -10.0, min_z = 0.0;
-        double max_x = 10.0, max_y = 10.0, max_z = 10.0;
+        double min_x = -0.9, min_y = -0.9, min_z = -0.05;
+        double max_x = 0.9, max_y = 0.9, max_z = 1.1;
     } workspace;
     
     // Replanning
