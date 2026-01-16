@@ -25,6 +25,12 @@ struct MotionConfig {
     double goal_orientation_tolerance = 0.15;
     double goal_joint_tolerance = 0.03;
     
+    // Gripper parameters
+    double gripper_max_velocity_scaling_factor = 0.8;
+    double gripper_max_acceleration_scaling_factor = 0.8;
+    double gripper_planning_time = 5.0;
+    int gripper_num_planning_attempts = 5;
+    
     // Cartesian path parameters
     std::vector<double> cartesian_step_sizes = {0.05, 0.03, 0.01};
     double min_cartesian_fraction = 0.5;

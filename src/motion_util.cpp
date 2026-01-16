@@ -26,11 +26,14 @@ namespace motion_util {
         arm_mgi.setPlanningPipelineId("ompl");
         arm_mgi.setPlannerId("RRTConnect");
         
+        // Set pose reference frame explicitly (Page 36, 65 documentation)
+        arm_mgi.setPoseReferenceFrame(kWorldFrame);
+        
         // Gripper settings
-        gripper_mgi.setMaxVelocityScalingFactor(0.8);
-        gripper_mgi.setMaxAccelerationScalingFactor(0.8);
-        gripper_mgi.setPlanningTime(5.0);
-        gripper_mgi.setNumPlanningAttempts(5);
+        gripper_mgi.setMaxVelocityScalingFactor(config.gripper_max_velocity_scaling_factor);
+        gripper_mgi.setMaxAccelerationScalingFactor(config.gripper_max_acceleration_scaling_factor);
+        gripper_mgi.setPlanningTime(config.gripper_planning_time);
+        gripper_mgi.setNumPlanningAttempts(config.gripper_num_planning_attempts);
 
         // Initialize state monitor for reliable state queries
         arm_mgi.startStateMonitor(2.0);  
