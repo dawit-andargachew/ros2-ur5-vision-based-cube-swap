@@ -61,6 +61,10 @@ public:
     }
 
 private:
+
+    // Define the threshold constant here
+    static constexpr double MIN_AREA_THRESHOLD = 200.0;
+
     void image_callback(const sensor_msgs::msg::Image::SharedPtr msg)
     {
         // Store the latest image (thread-safe)
@@ -114,8 +118,8 @@ private:
                 }
             }
 
-            // Filter: Must be larger than 200 pixels to be considered a real object
-            if (max_area > 200) {
+            // Filter: Must be larger than `MIN_AREA_THRESHOLD` pixels to be considered a real object
+            if (max_area > MIN_AREA_THRESHOLD) {
                 detections.push_back({c.name, max_x, max_area});
             }
         }
