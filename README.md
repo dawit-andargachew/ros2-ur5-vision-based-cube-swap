@@ -25,6 +25,7 @@ ros2 launch group_6_assignment_2 place_action_client.launch.py
 ### how to run cube color detector (need 3 terminals)
 
 ```bash
-ros2 launch ir_launch assignment_2.launch.py
-ros2 run group_6_assignment_2 color_detector
-ros2 service call /get_cube_colors group_6_assignment_2/srv/GetCubeColors {}
+    ros2 launch ir_launch assignment_2.launch.py
+    ros2 run group_6_assignment_2 color_detector
+    ros2 service call /get_cube_colors group_6_assignment_2/srv/GetCubeColors {}
+```
