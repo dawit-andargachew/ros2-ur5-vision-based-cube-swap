@@ -172,6 +172,8 @@ add_dependencies(orchestrator ${PROJECT_NAME})
 
 install(TARGETS 
   orchestrator
+  DESTINATION lib/${PROJECT_NAME}
+)
 add_executable(color_detector src/ColorDetector.cpp)
 ament_target_dependencies(color_detector rclcpp cv_bridge sensor_msgs)
 target_link_libraries(color_detector ${OpenCV_LIBRARIES})
