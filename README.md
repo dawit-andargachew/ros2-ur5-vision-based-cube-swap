@@ -240,7 +240,7 @@ sudo apt install ros-${ROS_DISTRO}-behaviortree-cpp
 **Issue**: Simulation not starting
 - Ensure Gazebo is properly installed: `which gz`
 - Check for port conflicts: `killall -9 gz gzclient gzserver`
-- Verify ROS2 workspace is sourced: `echo $ROS_DISTRO
+- Verify ROS2 workspace is sourced: `echo $ROS_DISTRO`
 
 ---
 
