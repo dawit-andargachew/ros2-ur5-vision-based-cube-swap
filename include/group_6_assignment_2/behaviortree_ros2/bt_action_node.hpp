@@ -74,7 +74,7 @@ inline const char* toStr(const ActionNodeErrorCode& err)
  *
  * The name of the action will be determined as follows:
  *
- * 1. If a value is passes in the InputPort "action_name", use that
+ * 1. If a value is passed in the InputPort "action_name", use that
  * 2. Otherwise, use the value in RosNodeParams::default_port_value
  */
 template <class ActionT>
