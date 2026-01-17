@@ -242,10 +242,6 @@ sudo apt install ros-${ROS_DISTRO}-behaviortree-cpp
 - Check for port conflicts: `killall -9 gz gzclient gzserver`
 - Verify ROS2 workspace is sourced: `echo $ROS_DISTRO
 
-**Issue**: Cubes not detected
-- Ensure AprilTag IDs 1 and 10 are visible to the camera
-- Check cube detector is running: `ros2 service list | grep get_cube_poses`
-
 ---
 
 ## Development
