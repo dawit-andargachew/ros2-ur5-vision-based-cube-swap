@@ -114,7 +114,7 @@ ros2 run group_6_assignment_2 cube_detector
 
 **Terminal 3** - Pick action server:
 ```bash
-ros2 run group_6_assignment_2 pick_action_server --ros-args -p use_sim_time:=true --params-file install/group_6_assignment_2/share/group_6_assignment_2/config/pick_params.yaml
+ros2 run group_6_assignment_2 pick_action_server --ros-args -p use_sim_time:=true --params-file install/group_6_assignment_2/share/group_6_assignment_2/config/pick_action_server.yaml
 ```
 
 **Terminal 4** - Place action server:
