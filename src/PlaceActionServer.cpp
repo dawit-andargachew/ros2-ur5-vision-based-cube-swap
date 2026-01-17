@@ -175,7 +175,6 @@ private:
     if (goal_handle->is_canceling()) return false;
     */
 
-
     //STEP 2 move to pre-place pose
     feedback->status = "Moving to pre-place pose";
     goal_handle->publish_feedback(feedback);
@@ -186,17 +185,6 @@ private:
     }
     if (goal_handle->is_canceling()) return false;
 
-    // STEP 5 DETACH OBJECT
-    feedback->status = "Detaching object from gripper";
-    goal_handle->publish_feedback(feedback);
-    if (!motion_util::detachObject(current_cube_id, arm_group_, get_logger())) {
-      RCLCPP_ERROR(get_logger(), "Failed to detach object from gripper");
-      return false;
-    }
-    if (goal_handle->is_canceling()) return false;
-    rclcpp::sleep_for(1s); // Brief pause to let physics settle
-
-
     //STEP 3 OPEN THE ARM
     feedback->status = "Opening gripper to release object";
     goal_handle->publish_feedback(feedback);
@@ -206,8 +194,19 @@ private:
     }
     if (goal_handle->is_canceling()) return false;
 
+    // STEP 4 DETACH OBJECT
+    feedback->status = "Detaching object from gripper";
+    goal_handle->publish_feedback(feedback);
+    if (!motion_util::detachObject(current_cube_id, arm_group_, get_logger())) {
+      RCLCPP_ERROR(get_logger(), "Failed to detach object from gripper");
+      return false;
+    }
+    if (goal_handle->is_canceling()) return false;
+    rclcpp::sleep_for(1s); // Brief pause to let physics settle
+
     // STEP 4 RAISE TO SAFE HEIGHT
-    // Small clearance move (joint or pose) to make the cartesian not fail hopefully
+
+    // Small clearance move (joint or pose) to make the cartesian not fail hopefully (part of RAISE TO...)
     /*
     geometry_msgs::msg::Pose clearance_pose =
         arm_group_.getCurrentPose().pose;
@@ -222,6 +221,7 @@ private:
     }
     */
 
+    /*
     feedback->status = "Moving up (Cartesian)...";
     goal_handle->publish_feedback(feedback);
     if (!move_up_cartesian(0.05))
@@ -230,8 +230,9 @@ private:
       return false;
     }
     if (goal_handle->is_canceling()) return false;
+    */
 
-    // FINISH
+    // STEP FINISH
     RCLCPP_INFO(get_logger(), "Place action completed successfully");
     return true;
   
@@ -250,7 +251,7 @@ private:
       place_pose.position.z = 0.446 + 0.18;
     } else if (target_table_id == 2) {
       //place_pose.position.x = 4.56 + 0.10; //old offset
-      place_pose.position.x = 4.56 + 0.05;
+      place_pose.position.x = 4.56 - 0.05;
       place_pose.position.y = -0.50 - 0.10;
       place_pose.position.z = 0.446 + 0.18;
     } else {
