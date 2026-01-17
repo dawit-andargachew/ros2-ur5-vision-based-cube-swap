@@ -36,8 +36,8 @@ namespace motion_util {
         gripper_mgi.setNumPlanningAttempts(config.gripper_num_planning_attempts);
         gripper_mgi.setGoalJointTolerance(config.gripper_goal_joint_tolerance); // hopefully wont fail as much
         // Initialize state monitor for reliable state queries
-        arm_mgi.startStateMonitor(2.0);  
-        gripper_mgi.startStateMonitor(2.0);
+        arm_mgi.startStateMonitor(config.state_monitor_wait_time);  
+        gripper_mgi.startStateMonitor(config.state_monitor_wait_time);
         
         // Set workspace bounds (Page 3 documentation)
         arm_mgi.setWorkspace(
@@ -101,12 +101,12 @@ namespace motion_util {
 
         shape_msgs::msg::SolidPrimitive table1_prim;
         table1_prim.type = shape_msgs::msg::SolidPrimitive::BOX;
-        table1_prim.dimensions = {0.3652, 0.3652, 0.016};
+        table1_prim.dimensions = {TableConfig::width, TableConfig::depth, TableConfig::height};
 
         geometry_msgs::msg::Pose table1_pose;
-        table1_pose.position.x = 3.97;
-        table1_pose.position.y = -1.10;
-        table1_pose.position.z = 0.322;
+        table1_pose.position.x = TableConfig::table1_x;
+        table1_pose.position.y = TableConfig::table1_y;
+        table1_pose.position.z = TableConfig::z_position;
         table1_pose.orientation.w = 1.0;
 
         table1.primitives.push_back(table1_prim);
@@ -120,12 +120,12 @@ namespace motion_util {
 
         shape_msgs::msg::SolidPrimitive table2_prim;
         table2_prim.type = shape_msgs::msg::SolidPrimitive::BOX;
-        table2_prim.dimensions = {0.3652, 0.3652, 0.016};
+        table2_prim.dimensions = {TableConfig::width, TableConfig::depth, TableConfig::height};
 
         geometry_msgs::msg::Pose table2_pose;
-        table2_pose.position.x = 4.56;
-        table2_pose.position.y = -0.50;  // Different Y position for second table
-        table2_pose.position.z = 0.322;
+        table2_pose.position.x = TableConfig::table2_x;
+        table2_pose.position.y = TableConfig::table2_y;
+        table2_pose.position.z = TableConfig::z_position;
         table2_pose.orientation.w = 1.0;
 
         table2.primitives.push_back(table2_prim);
@@ -137,7 +137,7 @@ namespace motion_util {
         planning_scene_.applyCollisionObject(table2);
 
         // Give PlanningSceneInterface time to process
-        rclcpp::sleep_for(500ms);
+        rclcpp::sleep_for(std::chrono::milliseconds(static_cast<int>(500)));
 
         return true;
     }
