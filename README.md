@@ -20,6 +20,13 @@ This package implements a complete pick-and-place system for swapping cubes betw
 
 ---
 
+## TODO
+
+- Integrate ColorDetector into the Orchestrator/BehaviorTree logic
+- Integrate go to Home after second place in BehvaiourTree logic
+
+---
+
 ## Building
 
 Navigate to your ROS2 workspace and build the package:
