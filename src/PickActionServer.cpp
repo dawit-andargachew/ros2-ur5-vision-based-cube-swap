@@ -54,7 +54,7 @@ public:
 
     MotionConfig config;  // Use default configuration
     configure_moveit(arm_group_, gripper_group_, config);
-    //apply_path_constraints(arm_group_, get_logger());  // ADDED: Apply path constraints
+    apply_path_constraints(arm_group_, get_logger());  // ADDED: Apply path constraints
 
     // Create service client for cube pose detection
     cube_pose_client_ = this->create_client<group_6_assignment_2::srv::GetCubePoses>("get_cube_poses");

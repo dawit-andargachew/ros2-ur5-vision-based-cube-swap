@@ -22,9 +22,9 @@ namespace motion_util {
         arm_mgi.setGoalOrientationTolerance(config.goal_orientation_tolerance);  // ~0.57 degrees
         arm_mgi.setGoalJointTolerance(config.goal_joint_tolerance);
         
-        // Use reliable planner
+        // Use reliable planner - RRTstar handles constraints better than RRTConnect
         arm_mgi.setPlanningPipelineId("ompl");
-        arm_mgi.setPlannerId("RRTConnect");
+        // arm_mgi.setPlannerId("RRTstar"); // handles constraints better than RRTConnect
         
         // Set pose reference frame explicitly (Page 36, 65 documentation)
         arm_mgi.setPoseReferenceFrame(kWorldFrame);
@@ -50,45 +50,30 @@ namespace motion_util {
 
     void apply_path_constraints(moveit::planning_interface::MoveGroupInterface& arm_group_, const rclcpp::Logger& logger)
     {
-        // moveit_msgs::msg::Constraints path_constraints;
-        // moveit_msgs::msg::JointConstraint lift_constraint;
-
-        // lift_constraint.joint_name = "shoulder_lift_joint";
-        // lift_constraint.position = -1.57;
-        // lift_constraint.tolerance_above = 1.0;
-        // lift_constraint.tolerance_below = 1.5;
-        // lift_constraint.weight = 1.0;
-
-        // path_constraints.joint_constraints.push_back(lift_constraint);
-        // arm_group_.setPathConstraints(path_constraints);
-
-        // RCLCPP_INFO(logger, "Elbow-up joint constraint applied.");
-
         moveit_msgs::msg::Constraints path_constraints;
-        path_constraints.name = "elbow_up_constraint";
-
-        moveit_msgs::msg::JointConstraint lift_constraint;
-        lift_constraint.joint_name = "shoulder_lift_joint";
+  
+        // 17th JAN NEW CONSTRAINT FOR BASE ROTATION
+        // Add shoulder_pan_joint constraint (max value 0 degrees, can be negative)
+        moveit_msgs::msg::JointConstraint pan_constraint;
+        pan_constraint.joint_name = "shoulder_pan_joint";
         
-        // Target position (Elbow Up)
-        lift_constraint.position = -1.50; 
+        // Target position slightly negative to stay away from zero limit
+        pan_constraint.position = -0.5;
         
-        // Tolerances
-        lift_constraint.tolerance_above = 1.5; 
-        lift_constraint.tolerance_below = 1.0; 
+        // Tolerances: allow 0.5 above (reaches 0), large below (very negative allowed)
+        pan_constraint.tolerance_above = 0.5;
+        pan_constraint.tolerance_below = 3.0;
         
         // Weight
-        lift_constraint.weight = 1.0;
+        pan_constraint.weight = 0.50;
 
-        path_constraints.joint_constraints.push_back(lift_constraint);
+        path_constraints.joint_constraints.push_back(pan_constraint);
+
 
         // Apply to the group
         arm_group_.setPathConstraints(path_constraints);
-        
-        // Optional: Loosen goal tolerance slightly to help planner succeed with constraints
-        arm_group_.setGoalJointTolerance(0.01); 
 
-        RCLCPP_INFO(logger, "Elbow-up joint constraint applied.");
+        RCLCPP_INFO(logger, "Joint constraints applied: elbow-up, shoulder-pan, and wrist-2 (0°-90°).");
     }
 
     bool setup_scene(moveit::planning_interface::PlanningSceneInterface& planning_scene_)

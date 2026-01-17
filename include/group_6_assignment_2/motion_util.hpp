@@ -17,8 +17,8 @@ struct MotionConfig {
     // Planning parameters
     double max_velocity_scaling_factor = 0.4;
     double max_acceleration_scaling_factor = 0.3;
-    double planning_time = 15.0;
-    int num_planning_attempts = 15;
+    double planning_time = 30.0;
+    int num_planning_attempts = 20;
     
     // Goal tolerances
     double goal_position_tolerance = 0.015;
