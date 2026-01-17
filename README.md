@@ -261,3 +261,19 @@ sudo apt install ros-${ROS_DISTRO}-behaviortree-cpp
 Edit [orchestrator_action_nodes.hpp](include/group_6_assignment_2/orchestrator_action_nodes.hpp) to customize BehaviorTree node behavior.
 
 ---
+three terminals to test pick
+
+ros2 launch ir_launch assignment_2.launch.py
+ros2 launch group_6_assignment_2 basic_a2_package.launch.py
+ros2 launch group_6_assignment_2 pick_action_client.launch.py
+ros2 launch group_6_assignment_2 place_action_client.launch.py
+```
+
+
+### How to run cube color detector (need 3 terminals)
+
+```bash
+    ros2 launch ir_launch assignment_2.launch.py
+    ros2 run group_6_assignment_2 color_detector
+    ros2 service call /get_cube_colors group_6_assignment_2/srv/GetCubeColors {}
+```

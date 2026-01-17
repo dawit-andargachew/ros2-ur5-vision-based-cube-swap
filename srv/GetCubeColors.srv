@@ -1,0 +1,6 @@
+# Request
+# Empty - just trigger the detection
+---
+# Response
+bool success               # True if colors were detected
+string message             # Formatted string like "Cube 1: RED | Cube 10: BLUE" or error message
