@@ -22,16 +22,13 @@ This package implements a complete pick-and-place system for swapping cubes betw
 
 ## Prerequisites
 
-**IMPORTANT**: This package requires BehaviorTree.CPP ROS2 integration for the orchestrator component.
-
 Install the required dependencies:
 
 ```bash
 sudo apt install ros-${ROS_DISTRO}-behaviortree-cpp
-sudo apt install ros-${ROS_DISTRO}-behaviortree-ros2
 ```
 
-**Note for Evaluators**: The `behaviortree_ros2` package provides the ROS2 action client wrapper used by the orchestrator. This is a standard ROS2 package available through apt. If not available on your system, you can still test the core pick/place functionality independently (see "Testing Without Orchestrator" section below).
+**Note**: This package includes embedded BehaviorTree.ROS2 action client code (Apache 2.0 licensed) from the [behaviortree_ros2](https://github.com/BehaviorTree/BehaviorTree.ROS2) project by Davide Faconti. This eliminates the need for external ROS2 package dependencies while maintaining full orchestrator functionality.
 
 ---
 
@@ -209,11 +206,14 @@ The swap logic is defined in [behaviour_trees/swap_logic.xml](behaviour_trees/sw
 2. If successful, retry picking cube 10 and placing on table 1 (up to max_retries)
 3. If either swap fails after retries, the entire operation fails
 
---- or `behaviortree_ros2 not found`
+---
+
+## Troubleshooting
+
+**Issue**: Compilation error `behaviortree_cpp not found`
 ```bash
-sudo apt install ros-${ROS_DISTRO}-behaviortree-cpp ros-${ROS_DISTRO}-behaviortree-ros2
+sudo apt install ros-${ROS_DISTRO}-behaviortree-cpp
 ```
-**Workaround**: Use the "Testing Without Orchestrator" method to run pick/place servers without BehaviorTree dependency.
 
 **Issue**: Orchestrator can't find XML file
 - Ensure you've run `colcon build` and sourced `install/setup.bash`
