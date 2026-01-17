@@ -3,7 +3,6 @@
  * ros2 jazzy node
  * State Machine Orchestrator for the swapping of two cubes on two respective tables
  * with UR5 robotic arm using ROS2 and MoveIt2.
- * Created on: June 10, 2024
  * We let cube 1 be on Table 1
  * We let cube 2 be on Table 2
  * These labels and information is known a priori.

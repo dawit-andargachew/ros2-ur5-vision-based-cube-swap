@@ -38,41 +38,39 @@ def generate_launch_description():
 
 	# 3. Pick action server (screen output for important logs)
 	pick_action_server_node = Node(
-		package="group_6_assignment_2",
+        package="group_6_assignment_2",
 		executable="pick_action_server",
 		name="pick_action_server",
 		output="screen",
 		parameters=[
-			{"use_sim_time": use_sim_time},
-			PathJoinSubstitution(
-				[FindPackageShare("group_6_assignment_2"), "config", "pick_action_server.yaml"]
+            {"use_sim_time": use_sim_time},
+            PathJoinSubstitution(
+                [FindPackageShare("group_6_assignment_2"), "config", "pick_action_server.yaml"]
             ),
-			PathJoinSubstitution(
-				[FindPackageShare("group_6_assignment_2"), "config", "robot_target_positions.yaml"]
-			),
-			moveit_config.to_dict(),
+            PathJoinSubstitution(
+                [FindPackageShare("group_6_assignment_2"), "config", "robot_target_positions.yaml"]
+            ),
+            moveit_config.to_dict(),
 		],
 	)
 
 	# 4. Place action server (screen output for important logs)
 	place_action_server_node = Node(
-		package="group_6_assignment_2",
+        package="group_6_assignment_2",
 		executable="place_action_server",
 		name="place_action_server",
 		output="screen",
 		parameters=[
 			{"use_sim_time": use_sim_time},
-			moveit_config.to_dict(),
-		
-			PathJoinSubstitution(
-				[FindPackageShare("group_6_assignment_2"), "config", "pick_action_server.yaml"]
-			),
-			PathJoinSubstitution(
-				[FindPackageShare("group_6_assignment_2"), "config", "robot_target_positions.yaml"]
-			)
-		],
-	)
-
+            moveit_config.to_dict(),
+            PathJoinSubstitution(
+                [FindPackageShare("group_6_assignment_2"), "config", "pick_action_server.yaml"]
+            ),
+            PathJoinSubstitution(
+                [FindPackageShare("group_6_assignment_2"), "config", "robot_target_positions.yaml"]
+            )
+        ],
+    )
 	# 5. Orchestrator (delayed start to allow servers to initialize, screen output)
 	orchestrator_node = TimerAction(
 		period=5.0,  # Wait 5 seconds for all servers to start
