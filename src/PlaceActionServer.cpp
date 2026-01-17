@@ -194,6 +194,16 @@ private:
       return false;
     }
     if (goal_handle->is_canceling()) return false;
+
+    // STEP 5 RAISE TO SAFE HEIGHT
+    feedback->status = "Moving up (Cartesian)...";
+    goal_handle->publish_feedback(feedback);
+    if (!move_up_cartesian(0.05))
+    {
+      RCLCPP_ERROR(get_logger(), "Failed to raise to safe height");
+      return false;
+    }
+    if (goal_handle->is_canceling()) return false;
    
     // STEP 4 DETACH OBJECT
     feedback->status = "Detaching object from gripper";
@@ -204,17 +214,6 @@ private:
     }
     if (goal_handle->is_canceling()) return false;
     rclcpp::sleep_for(1s); // Brief pause to let physics settle
-
-    // STEP 5 RAISE TO SAFE HEIGHT
-    feedback->status = "Moving up (Cartesian)...";
-    goal_handle->publish_feedback(feedback);
-    if (!move_up_cartesian(-0.10)) // TO THAREN: I COULDN'T FIND THE VALUE WHEN IT GOES DOWN, I GUESS IT'S 0.20?
-    {
-      RCLCPP_ERROR(get_logger(), "Failed to raise to safe height");
-      return false;
-    }
-    if (goal_handle->is_canceling()) return false;
-
 
     // FINISH
     RCLCPP_INFO(get_logger(), "Place action completed successfully");
