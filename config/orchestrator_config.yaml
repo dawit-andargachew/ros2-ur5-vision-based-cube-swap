@@ -1,0 +1,5 @@
+orchestrator_node:
+  ros__parameters:
+    max_retries: 5
+    wait_durations: 2.0
+    logging_level: "info"

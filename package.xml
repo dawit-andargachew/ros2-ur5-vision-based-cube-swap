@@ -22,6 +22,9 @@
   <depend>tf2</depend>
   <depend>tf2_ros</depend>
   <depend>shape_msgs</depend>
+  <depend>behaviortree_cpp</depend>
+  <depend>behaviortree_ros2</depend>
+  <depend>ament_index_cpp</depend>
   <depend>cv_bridge</depend>
   <depend>sensor_msgs</depend>
   <depend>libopencv-dev</depend>

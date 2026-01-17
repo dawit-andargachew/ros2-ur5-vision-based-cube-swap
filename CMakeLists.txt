@@ -23,6 +23,10 @@ find_package(cv_bridge REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(rclcpp_action REQUIRED)
+find_package(behaviortree_cpp REQUIRED)
+#find_package(behaviortree_ros2 REQUIRED)
+find_package(ament_index_cpp REQUIRED)
+
 # find_package(ament_cmake_python REQUIRED)
 # Create executable 'pick_action_server' from 'src/PickActionServer.cpp'
 add_executable(pick_action_server src/PickActionServer.cpp)
@@ -150,6 +154,26 @@ install(TARGETS
   DESTINATION lib/${PROJECT_NAME}
 )
 
+# Create orchestrator executable
+add_executable(orchestrator src/Orchestrator.cpp)
+ament_target_dependencies(orchestrator
+  rclcpp
+  rclcpp_action
+  behaviortree_cpp
+  #behaviortree_ros2
+  ament_index_cpp
+)
+target_include_directories(orchestrator PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(orchestrator ${cpp_typesupport_target})
+add_dependencies(orchestrator ${PROJECT_NAME})
+
+install(TARGETS 
+  orchestrator
+  DESTINATION lib/${PROJECT_NAME}
+)
 add_executable(color_detector src/ColorDetector.cpp)
 ament_target_dependencies(color_detector rclcpp cv_bridge sensor_msgs)
 target_link_libraries(color_detector ${OpenCV_LIBRARIES})
@@ -166,6 +190,10 @@ install(DIRECTORY launch
 )
 
 install(DIRECTORY config
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(DIRECTORY behaviour_trees
   DESTINATION share/${PROJECT_NAME}
 )
 
