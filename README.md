@@ -228,7 +228,7 @@ sudo apt install ros-${ROS_DISTRO}-behaviortree-cpp
 **Issue**: Pick/place actions fail
 - Check action server logs for planning failures
 - Verify MoveIt is properly loaded: `ros2 topic list | grep move_group`
-- Tune motion parameters in [config/pick_params.yaml](config/pick_params.yaml)
+- Tune motion parameters in [config/pick_action_server.yaml](config/pick_action_server.yaml)
 - Check workspace bounds and collision objects
 
 **Issue**: Cubes not detected
