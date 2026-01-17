@@ -24,7 +24,7 @@
  * both actions can potentially fail if motion planning fails or if the action is cancelled.
  * The Orchestrator must handle these failures and transition to an ERROR state if needed.
  * 
- * Therefore we also define some yaml configration for the orchestrator parameters such as:
+ * Therefore we also define some yaml configuration for the orchestrator parameters such as:
  * - max_retries: number of retries for pick/place before transitioning to ERROR state
  * - wait_durations: durations to wait between retries
  * - logging_level: level of logging detail
