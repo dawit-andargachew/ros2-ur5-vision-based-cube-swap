@@ -21,7 +21,7 @@ find_package(rosidl_default_generators REQUIRED)
 find_package(shape_msgs REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(behaviortree_cpp REQUIRED)
-find_package(behaviortree_ros2 REQUIRED)
+#find_package(behaviortree_ros2 REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 
 # find_package(ament_cmake_python REQUIRED)
@@ -156,7 +156,7 @@ ament_target_dependencies(orchestrator
   rclcpp
   rclcpp_action
   behaviortree_cpp
-  behaviortree_ros2
+  #behaviortree_ros2
   ament_index_cpp
 )
 target_include_directories(orchestrator PUBLIC

@@ -1,7 +1,7 @@
 #ifndef ORCHESTRATOR_ACTION_NODES_HPP_
 #define ORCHESTRATOR_ACTION_NODES_HPP_
 
-#include "behaviortree_ros2/bt_action_node.hpp"
+#include "group_6_assignment_2/behaviortree_ros2/bt_action_node.hpp"
 #include "group_6_assignment_2/action/pick.hpp"
 #include "group_6_assignment_2/action/place.hpp"
 
