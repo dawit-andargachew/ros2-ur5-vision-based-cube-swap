@@ -208,7 +208,7 @@ private:
     // STEP 5 RAISE TO SAFE HEIGHT
     feedback->status = "Moving up (Cartesian)...";
     goal_handle->publish_feedback(feedback);
-    if (!move_up_cartesian(-0.10)) // TO THAREN: I COULDN'T FIND THE VALUE WHEN IT GOES DOWN, I GUESS IT'S 0.20?
+    if (!move_up_cartesian(0.05))  // Move UP 5cm after releasing
     {
       RCLCPP_ERROR(get_logger(), "Failed to raise to safe height");
       return false;
@@ -233,8 +233,8 @@ private:
       place_pose.position.y = -1.10 - 0.10; //new offset (test also on other machines)
       place_pose.position.z = 0.446 + 0.13;
     } else if (target_table_id == 2) {
-      place_pose.position.x = 4.56 + 0.10; //new offset (test also on other machines)
-      place_pose.position.y = -0.50 - 0.10;
+      place_pose.position.x = 4.56 - 0.10; // +0.10 was too far for the gripper to perform 'lift up'
+      place_pose.position.y = -0.50 + 0.10; //new offsets to try far from camera close corner to gripper
       place_pose.position.z = 0.446 + 0.13;
     } else {
       RCLCPP_ERROR(get_logger(), "Invalid target_table_id: %d", target_table_id);
