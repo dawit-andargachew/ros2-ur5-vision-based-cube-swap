@@ -105,6 +105,7 @@ int main(int argc, char ** argv) {
     RCLCPP_WARN(node->get_logger(), "Swap operation ended with status: %d", static_cast<int>(status));
   }
 
+  rclcpp::shutdown();
   // Return non-zero exit code on failure or unexpected status
   if (status == BT::NodeStatus::SUCCESS) {
     return 0;
