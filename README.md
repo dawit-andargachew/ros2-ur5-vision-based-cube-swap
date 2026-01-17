@@ -155,7 +155,7 @@ ros2 action send_goal /place group_6_assignment_2/action/Place "{grabbed_cube_id
 
 ### Pick Action Parameters
 
-Edit [config/pick_params.yaml](config/pick_params.yaml) to tune grasp parameters:
+Edit [config/pick_action_server.yaml](config/pick_action_server.yaml) to tune grasp parameters:
 - Grasp orientation (roll, pitch, yaw)
 - Grasp offsets from cube center
 - Pre-grasp approach distance
