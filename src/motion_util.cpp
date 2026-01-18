@@ -52,7 +52,7 @@ namespace motion_util {
     {
         moveit_msgs::msg::Constraints path_constraints;
   
-        // 17th JAN NEW CONSTRAINT FOR BASE ROTATION
+        // 17th January 2026: New constraint for base rotation
         // Add shoulder_pan_joint constraint (max value 0 degrees, can be negative)
         moveit_msgs::msg::JointConstraint pan_constraint;
         pan_constraint.joint_name = "shoulder_pan_joint";
