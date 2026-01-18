@@ -1,0 +1,11 @@
+# Request
+# Empty: calling the action means "go home"
+---
+
+# Result
+bool success
+string message
+---
+
+# Feedback
+string status

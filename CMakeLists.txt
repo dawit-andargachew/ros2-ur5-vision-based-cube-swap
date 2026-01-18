@@ -65,6 +65,23 @@ ament_target_dependencies(place_action_client
   tf2
 )
 
+add_executable(home_action_server src/HomeActionServer.cpp)
+# Link necessary libraries
+ament_target_dependencies(home_action_server
+  rclcpp
+  rclcpp_action
+  moveit_ros_planning_interface
+  moveit_core
+  moveit_msgs
+)
+
+add_executable(home_action_client src/HomeActionClient.cpp)
+# Link necessary libraries
+ament_target_dependencies(home_action_client
+  rclcpp
+  rclcpp_action
+)
+
 # Add the motion_util library
 add_library(motion_util_lib STATIC src/motion_util.cpp)
 ament_target_dependencies(motion_util_lib
@@ -85,10 +102,12 @@ target_include_directories(motion_util_lib PUBLIC
 # Link the library to the pick executable
 target_link_libraries(pick_action_server motion_util_lib)
 target_link_libraries(place_action_server motion_util_lib)
+target_link_libraries(home_action_server motion_util_lib)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "action/Pick.action"
   "action/Place.action"
+  "action/Home.action"
   "srv/GetCubePoses.srv"
   "srv/GetCubeColors.srv"
   DEPENDENCIES geometry_msgs
@@ -98,12 +117,16 @@ add_dependencies(pick_action_server ${PROJECT_NAME})
 add_dependencies(pick_action_client ${PROJECT_NAME})
 add_dependencies(place_action_server ${PROJECT_NAME})
 add_dependencies(place_action_client ${PROJECT_NAME})
+add_dependencies(home_action_server ${PROJECT_NAME})
+add_dependencies(home_action_client ${PROJECT_NAME})
 
 install(TARGETS
   pick_action_server
   pick_action_client
   place_action_server
   place_action_client
+  home_action_server
+  home_action_client
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -143,6 +166,8 @@ target_link_libraries(pick_action_server ${cpp_typesupport_target})
 target_link_libraries(pick_action_client ${cpp_typesupport_target})
 target_link_libraries(place_action_server ${cpp_typesupport_target})
 target_link_libraries(place_action_client ${cpp_typesupport_target})
+target_link_libraries(home_action_server ${cpp_typesupport_target})
+target_link_libraries(home_action_client ${cpp_typesupport_target})
 target_link_libraries(cube_detector ${cpp_typesupport_target})
 
 install(TARGETS 
