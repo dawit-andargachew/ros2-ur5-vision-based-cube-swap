@@ -42,6 +42,7 @@ using Pick = group_6_assignment_2::action::Pick;
 using Place = group_6_assignment_2::action::Place;
 
 #include <behaviortree_cpp/bt_factory.h>
+#include <behaviortree_cpp/loggers/bt_cout_logger.h>
 #include "group_6_assignment_2/orchestrator_action_nodes.hpp" 
 
 int main(int argc, char ** argv) {
@@ -57,6 +58,9 @@ int main(int argc, char ** argv) {
   params.nh = node;
   factory.registerNodeType<PickActionNode>("PickAction", params);
   factory.registerNodeType<PlaceActionNode>("PlaceAction", params);
+  factory.registerNodeType<HomeActionNode>("HomeAction", params);
+  factory.registerNodeType<DetectColorAction>("DetectColorAction", params);
+  factory.registerNodeType<DisplayColorResult>("DisplayColorResult", params);
 
   // 3. Load Tree from installed behaviour_trees directory
   std::string package_share_directory = ament_index_cpp::get_package_share_directory("group_6_assignment_2");
@@ -68,12 +72,24 @@ int main(int argc, char ** argv) {
   int retries = node->declare_parameter("max_retries", 3);
   tree.rootBlackboard()->set("max_retries", retries);
 
+  // Enable detailed BehaviorTree logging (shows retries, node transitions, etc.)
+  bool enable_bt_logging = node->declare_parameter("enable_bt_logging", true);
+  std::unique_ptr<BT::StdCoutLogger> logger;
+  if (enable_bt_logging) {
+    logger = std::make_unique<BT::StdCoutLogger>(tree);
+    RCLCPP_INFO(node->get_logger(), "BehaviorTree detailed logging ENABLED (shows all node ticks, retries, and transitions)");
+  } else {
+    RCLCPP_INFO(node->get_logger(), "BehaviorTree detailed logging DISABLED");
+  }
+
   RCLCPP_INFO(node->get_logger(), "Waiting for action servers to become available...");
-  RCLCPP_INFO(node->get_logger(), "Make sure 'pick_action_server' and 'place_action_server' are running!");
+  RCLCPP_INFO(node->get_logger(), "Make sure 'pick_action_server', 'place_action_server', 'home_action_server', and 'color_detector' service are running!");
   std::this_thread::sleep_for(2s);
 
   // 4. Run the tree
+  RCLCPP_INFO(node->get_logger(), "=================================================");
   RCLCPP_INFO(node->get_logger(), "Starting BehaviorTree execution with max_retries=%d", retries);
+  RCLCPP_INFO(node->get_logger(), "=================================================");
   RCLCPP_INFO(node->get_logger(), "Watch for action feedback and retry messages below...");
   
   BT::NodeStatus status = BT::NodeStatus::RUNNING;
@@ -96,13 +112,17 @@ int main(int argc, char ** argv) {
   }
 
   // Report final status
+  RCLCPP_INFO(node->get_logger(), "=================================================");
   if (status == BT::NodeStatus::SUCCESS) {
-    RCLCPP_INFO(node->get_logger(), "Swap operation completed successfully!");
+    RCLCPP_INFO(node->get_logger(), "SWAP OPERATION COMPLETED SUCCESSFULLY!");
+    RCLCPP_INFO(node->get_logger(), "Total ticks: %d", tick_count);
   } else if (status == BT::NodeStatus::FAILURE) {
-    RCLCPP_ERROR(node->get_logger(), "Swap operation FAILED after all retries");
+    RCLCPP_ERROR(node->get_logger(), "SWAP OPERATION FAILED after all retries");
+    RCLCPP_ERROR(node->get_logger(), "Total ticks: %d", tick_count);
   } else {
-    RCLCPP_WARN(node->get_logger(), "Swap operation ended with status: %d", static_cast<int>(status));
+    RCLCPP_WARN(node->get_logger(), "Swap operation ended with unexpected status: %d", static_cast<int>(status));
   }
+  RCLCPP_INFO(node->get_logger(), "=================================================");
 
   rclcpp::shutdown();
   // Return non-zero exit code on failure or unexpected status

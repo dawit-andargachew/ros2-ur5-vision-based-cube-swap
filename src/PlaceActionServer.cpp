@@ -197,12 +197,12 @@ private:
 
     // new path constraints
     moveit_msgs::msg::Constraints old_path_constraints = arm_group_.getPathConstraints();
-    moveit_msgs::msg::Constraints path_constraints;
+    moveit_msgs::msg::Constraints path_constraints = old_path_constraints; // start from existing constraints
   
 
     path_constraints.orientation_constraints.push_back(oc);
     arm_group_.setPathConstraints(path_constraints);
-    RCLCPP_INFO(get_logger(), "Applied orientation constraint: link=%s, tolerance=±90°", oc.link_name.c_str());
+    RCLCPP_INFO(get_logger(), "Applied orientation constraint: link=%s, tolerance=±180°", oc.link_name.c_str());
 
     bool place_success = motion_util::plan_and_execute_to_pose(place_pose, arm_group_, get_logger());
     //back to old constraints
