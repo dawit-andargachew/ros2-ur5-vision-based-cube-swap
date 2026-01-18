@@ -63,10 +63,7 @@ def generate_launch_description():
 		parameters=[
 			{"use_sim_time": use_sim_time},
 			PathJoinSubstitution(
-				[FindPackageShare("group_6_assignment_2"), "config", "pick_action_server.yaml"]
-			),
-			PathJoinSubstitution(
-				[FindPackageShare("group_6_assignment_2"), "config", "robot_target_positions.yaml"]
+				[FindPackageShare("group_6_assignment_2"), "config", "planning_configuration.yaml"]
 			),
 			moveit_config.to_dict(),
 		],
@@ -80,10 +77,7 @@ def generate_launch_description():
        	parameters=[
         	{"use_sim_time": use_sim_time},
 			PathJoinSubstitution(
-				[FindPackageShare("group_6_assignment_2"), "config", "pick_action_server.yaml"]
-			),
-			PathJoinSubstitution(
-				[FindPackageShare("group_6_assignment_2"), "config", "robot_target_positions.yaml"]
+				[FindPackageShare("group_6_assignment_2"), "config", "planning_configuration.yaml"]
 			),
 			moveit_config.to_dict(),
        ],
@@ -97,10 +91,7 @@ def generate_launch_description():
 		parameters=[
 			{"use_sim_time": use_sim_time},
 			PathJoinSubstitution(
-				[FindPackageShare("group_6_assignment_2"), "config", "pick_action_server.yaml"]
-			),
-			PathJoinSubstitution(
-				[FindPackageShare("group_6_assignment_2"), "config", "robot_target_positions.yaml"]
+				[FindPackageShare("group_6_assignment_2"), "config", "planning_configuration.yaml"]
 			),
 			moveit_config.to_dict(),
 		],
