@@ -1,3 +1,20 @@
+/**
+ * Utility Module: motion_util
+ * 
+ * type: utility/library module
+ * 
+ * purpose:
+ * Provides motion planning and execution utilities for robotic arm control.
+ * Handles MoveIt configuration, joint trajectory execution, and motion planning.
+ * Contains helper functions for common motion tasks across action servers and clients.
+ * 
+ * 
+ * exports:
+ *  configure_moveit() - Configure MoveIt planning parameters
+ *  move_to_joint_configuration() - Move arm to specified joint angles
+ *  move_to_pose() - Move arm to specified cartesian pose
+ */
+
 #include "group_6_assignment_2/motion_util.hpp"
 #include <chrono>
 #include <map>
@@ -11,6 +28,7 @@ namespace motion_util {
     void configure_moveit(moveit::planning_interface::MoveGroupInterface& arm_mgi,
                     moveit::planning_interface::MoveGroupInterface& gripper_mgi,
                     const MotionConfig& config) {
+                        
         // Consistent arm settings - optimized for reliability
         arm_mgi.setMaxVelocityScalingFactor(config.max_velocity_scaling_factor);  // Moderate speed
         arm_mgi.setMaxAccelerationScalingFactor(config.max_acceleration_scaling_factor);  // Smooth acceleration
@@ -35,6 +53,7 @@ namespace motion_util {
         gripper_mgi.setPlanningTime(config.gripper_planning_time);
         gripper_mgi.setNumPlanningAttempts(config.gripper_num_planning_attempts);
         gripper_mgi.setGoalJointTolerance(config.gripper_goal_joint_tolerance); // hopefully wont fail as much
+
         // Initialize state monitor for reliable state queries
         arm_mgi.startStateMonitor(config.state_monitor_wait_time);  
         gripper_mgi.startStateMonitor(config.state_monitor_wait_time);
@@ -51,8 +70,7 @@ namespace motion_util {
     void apply_path_constraints(moveit::planning_interface::MoveGroupInterface& arm_group_, const rclcpp::Logger& logger)
     {
         moveit_msgs::msg::Constraints path_constraints;
-  
-        // 17th January 2026: New constraint for base rotation
+        
         // Add shoulder_pan_joint constraint (max value 0 degrees, can be negative)
         moveit_msgs::msg::JointConstraint pan_constraint;
         pan_constraint.joint_name = "shoulder_pan_joint";
@@ -64,12 +82,10 @@ namespace motion_util {
         pan_constraint.tolerance_above = 0.5;
         pan_constraint.tolerance_below = 4.18879;
         
-        
         // Weight
         pan_constraint.weight = 1.0;
 
         path_constraints.joint_constraints.push_back(pan_constraint);
-
 
         // Apply to the group
         arm_group_.setPathConstraints(path_constraints);
@@ -287,4 +303,4 @@ namespace motion_util {
         }
     }
 
-} // namespace motion_util
+} 

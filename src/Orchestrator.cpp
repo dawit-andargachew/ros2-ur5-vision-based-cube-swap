@@ -125,6 +125,7 @@ int main(int argc, char ** argv) {
   RCLCPP_INFO(node->get_logger(), "=================================================");
 
   rclcpp::shutdown();
+  
   // Return non-zero exit code on failure or unexpected status
   if (status == BT::NodeStatus::SUCCESS) {
     return 0;

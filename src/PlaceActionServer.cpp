@@ -1,3 +1,19 @@
+/**
+ * Node: place_action_server
+ * 
+ * type: action server node
+ * 
+ * purpose:
+ * Handles place action requests for placing cubes on target tables.
+ * Plans and executes placement trajectories using MoveIt.
+ * Manages gripper control and collision objects during placement operations.
+ * Updates the planning scene after successful placements.
+ * 
+ * 
+ * actions:
+ *  Provides an action server "place" that places cubes on specified target tables.
+ */
+
 #include <chrono>
 #include <map>
 #include <memory>
@@ -51,21 +67,16 @@ public:
   }
 
 private:
-  // ======================
+
   // Action server
-  // ======================
   rclcpp_action::Server<Place>::SharedPtr action_server_;
 
-  // ======================
   // MoveIt
-  // ======================
   moveit::planning_interface::MoveGroupInterface arm_group_;
   moveit::planning_interface::MoveGroupInterface gripper_group_;
   moveit::planning_interface::PlanningSceneInterface planning_scene_;
 
-  // ======================
   // Debug visualization
-  // ======================
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr place_pose_pub_;
 
   // ======================
@@ -97,7 +108,6 @@ private:
 
   // ======================
   // Action callbacks
-  // ======================
   rclcpp_action::GoalResponse handle_goal(
     const rclcpp_action::GoalUUID&,
     std::shared_ptr<const Place::Goal> goal)
@@ -139,11 +149,7 @@ private:
     }
   }
 
-  // ======================
   // Place sequence
-  // ======================
-
-  
   bool run_place_sequence(
     uint8_t grabbed_cube_id,
     uint8_t target_table_id,
@@ -186,7 +192,7 @@ private:
     oc.absolute_x_axis_tolerance = 3.14159;  // Allow ~180 degrees deviation, we just want to prevent a full 360 flip
     oc.absolute_y_axis_tolerance = 3.14159;
     oc.absolute_z_axis_tolerance = 3.14159;
-    oc.weight = 1.0; // we just want to suggest a little bit, not enforce strictly
+    oc.weight = 1.0;
 
     // new path constraints
     moveit_msgs::msg::Constraints old_path_constraints = arm_group_.getPathConstraints();
@@ -277,7 +283,6 @@ private:
   }
 
   // compute goal pose function returns a pose
-  // simple offset depending on the table id
   std::optional<geometry_msgs::msg::Pose> compute_goal_place_pose(
     uint8_t target_table_id)
   {  

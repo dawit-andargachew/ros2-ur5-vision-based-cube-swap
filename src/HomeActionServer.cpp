@@ -1,3 +1,18 @@
+/**
+ * Node: home_action_server
+ * 
+ * type: action server node
+ * 
+ * purpose:
+ * Handles home position requests for the robotic arm.
+ * Provides an action server that moves the arm to a predefined home configuration.
+ * The home position is loaded from ROS parameters and executed using MoveIt.
+ * 
+ * 
+ * actions:
+ *  Provides an action server "home" that moves the robot to the home position.
+ */
+
 #include <map>
 #include <memory>
 #include <string>
@@ -41,16 +56,13 @@ public:
   }
 
 private:
-  // =========================
+
   // Members
-  // =========================
   rclcpp_action::Server<Home>::SharedPtr action_server_;
   moveit::planning_interface::MoveGroupInterface arm_group_;
   std::map<std::string, double> home_joint_config_;
 
-  // =========================
   // Parameters
-  // =========================
   void declare_home_parameters()
   {
     this->declare_parameter("home_position.shoulder_pan_joint", 0.0);
@@ -79,9 +91,7 @@ private:
     RCLCPP_INFO(get_logger(), "Loaded home joint configuration from parameters");
   }
 
-  // =========================
   // Action callbacks
-  // =========================
   rclcpp_action::GoalResponse handle_goal(
     const rclcpp_action::GoalUUID &,
     std::shared_ptr<const Home::Goal>)
@@ -151,7 +161,7 @@ private:
   }
 };
 
-} // namespace home_action_cpp
+}
 
 int main(int argc, char ** argv)
 {
