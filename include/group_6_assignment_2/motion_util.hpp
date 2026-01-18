@@ -41,6 +41,10 @@ struct MotionConfig {
     // Note: jump_threshold is deprecated in newer MoveIt versions
     // double jump_threshold = 0.0;  // Deprecated - no longer used
     
+    // State monitoring and timing
+    double state_monitor_wait_time = 2.0;  // seconds to wait for state monitor initialization
+    double scene_update_delay = 0.5;  // seconds to wait after applying collision objects
+    
     // Workspace bounds
     struct Workspace {
         double min_x = -0.9, min_y = -0.9, min_z = -0.05;
@@ -106,6 +110,22 @@ struct MotionConfig {
     static constexpr const char* kGripperGroupName = "ir_gripper";  
     static constexpr const char* kActiveJointName = "robotiq_85_left_knuckle_joint";
     static constexpr const char* kWorldFrame = "world";
+    
+    // Table collision object dimensions and positions
+    struct TableConfig {
+        static constexpr double width = 0.3652;
+        static constexpr double depth = 0.3652;
+        static constexpr double height = 0.016;
+        static constexpr double z_position = 0.322;
+
+        // Table 1 position
+        static constexpr double table1_x = 4.01;
+        static constexpr double table1_y = -1.10;
+        
+        // Table 2 position
+        static constexpr double table2_x = 4.6;
+        static constexpr double table2_y = -0.50;
+    };
 } // namespace motion_util
 
 #endif
