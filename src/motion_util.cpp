@@ -74,7 +74,7 @@ namespace motion_util {
         // Apply to the group
         arm_group_.setPathConstraints(path_constraints);
 
-        RCLCPP_INFO(logger, "Joint constraints applied: elbow-up, shoulder-pan, and wrist-2 (0°-90°).");
+        RCLCPP_INFO(logger, "Joint constraint applied: shoulder_pan_joint limit for base rotation.");
     }
 
     bool setup_scene(moveit::planning_interface::PlanningSceneInterface& planning_scene_)
