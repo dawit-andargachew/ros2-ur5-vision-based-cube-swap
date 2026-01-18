@@ -31,7 +31,7 @@ ros2 launch ir_launch assignment_2.launch.py
 
 **Terminal 2** - Launch complete system (cube and color detector, action servers, orchestrator):
 ```bash
-ros2 launch group_6_assignment_2 orchestrator_full.launch.py use_sim_time:=true max_retries:=3
+ros2 launch group_6_assignment_2 orchestrator_full.launch.py use_sim_time:=true max_retries:=5
 ```
 
 The orchestrator will:
