@@ -39,7 +39,7 @@ public:
 
     MotionConfig config;  // Use default configuration
     configure_moveit(arm_group_, gripper_group_, config);
-
+    apply_path_constraints(arm_group_, get_logger());  // ADDED: Apply path constraints
     cube_pose_client_ =
       this->create_client<group_6_assignment_2::srv::GetCubePoses>("get_cube_poses");
 
@@ -145,6 +145,10 @@ private:
     }
     */
     //STEP 1 compute goal place pose
+    RCLCPP_INFO(get_logger(), "=== PLACE SEQUENCE START: cube_%d -> table_%d ===", grabbed_cube_id, target_table_id);
+    feedback->status = "Computing place pose";
+    goal_handle->publish_feedback(feedback);
+    
     std::optional<geometry_msgs::msg::Pose> place_pose_opt = compute_goal_place_pose(target_table_id);
     if (!place_pose_opt) {
       RCLCPP_ERROR(get_logger(), "Failed to compute goal place pose. Check target_table_id validity");
@@ -152,8 +156,9 @@ private:
     }
     geometry_msgs::msg::Pose place_pose = *place_pose_opt;
     publish_debug_pose(place_pose, place_pose_pub_);
-    RCLCPP_INFO(get_logger(), "Place pose: x=%.3f, y=%.3f, z=%.3f",
-                place_pose.position.x, place_pose.position.y, place_pose.position.z);
+    RCLCPP_INFO(get_logger(), "Target place pose: x=%.3f, y=%.3f, z=%.3f | orientation: x=%.3f, y=%.3f, z=%.3f, w=%.3f",
+                place_pose.position.x, place_pose.position.y, place_pose.position.z,
+                place_pose.orientation.x, place_pose.orientation.y, place_pose.orientation.z, place_pose.orientation.w);
 
 
     /*
@@ -174,49 +179,76 @@ private:
     }
     if (goal_handle->is_canceling()) return false;
     */
-
-
+  
     //STEP 2 move to pre-place pose
+    RCLCPP_INFO(get_logger(), "STEP 2: Moving to pre-place pose with orientation constraint");
     feedback->status = "Moving to pre-place pose";
     goal_handle->publish_feedback(feedback);
-    
-    if(!motion_util::plan_and_execute_to_pose(place_pose, arm_group_, get_logger())) {
-      RCLCPP_ERROR(get_logger(), "Failed to move to pre-place pose");
+
+    // // Add orientation constraint to keep gripper pointing down during motion
+    moveit_msgs::msg::OrientationConstraint oc;
+    oc.header.frame_id = "world";
+    oc.link_name = arm_group_.getEndEffectorLink();
+    oc.orientation = place_pose.orientation;  // Keep target orientation (downward)
+    oc.absolute_x_axis_tolerance = 3.14159;  // Allow ~180 degrees deviation, we just want to prevent a full 360 flip
+    oc.absolute_y_axis_tolerance = 3.14159;
+    oc.absolute_z_axis_tolerance = 3.14159;
+    oc.weight = 1.0; // we just want to suggest a little bit, not enforce strictly
+
+    // new path constraints
+    moveit_msgs::msg::Constraints old_path_constraints = arm_group_.getPathConstraints();
+    moveit_msgs::msg::Constraints path_constraints;
+  
+
+    path_constraints.orientation_constraints.push_back(oc);
+    arm_group_.setPathConstraints(path_constraints);
+    RCLCPP_INFO(get_logger(), "Applied orientation constraint: link=%s, tolerance=±90°", oc.link_name.c_str());
+
+    bool place_success = motion_util::plan_and_execute_to_pose(place_pose, arm_group_, get_logger());
+    //back to old constraints
+    arm_group_.setPathConstraints(old_path_constraints);
+    RCLCPP_INFO(get_logger(), "Removed orientation constraint, joint constraints remain active");
+
+    if(!place_success) {
+      RCLCPP_ERROR(get_logger(), "FAILED: Could not reach pre-place pose");
       return false;
     }
+    RCLCPP_INFO(get_logger(), "SUCCESS: Reached pre-place pose");
     if (goal_handle->is_canceling()) return false;
 
     //STEP 3 OPEN THE ARM
+    RCLCPP_INFO(get_logger(), "STEP 3: Opening gripper to release cube");
     feedback->status = "Opening gripper to release object";
     goal_handle->publish_feedback(feedback);
     if (!motion_util::setGripper(0.0, gripper_group_, get_logger())) {
-      RCLCPP_ERROR(get_logger(), "Failed to open gripper");
+      RCLCPP_ERROR(get_logger(), "FAILED: Could not open gripper");
       return false;
     }
+    RCLCPP_INFO(get_logger(), "SUCCESS: Gripper opened, cube released");
     if (goal_handle->is_canceling()) return false;
-   
+
     // STEP 4 DETACH OBJECT
+    RCLCPP_INFO(get_logger(), "STEP 4: Detaching cube from planning scene");
     feedback->status = "Detaching object from gripper";
     goal_handle->publish_feedback(feedback);
     if (!motion_util::detachObject(current_cube_id, arm_group_, get_logger())) {
-      RCLCPP_ERROR(get_logger(), "Failed to detach object from gripper");
+      RCLCPP_ERROR(get_logger(), "FAILED: Could not detach cube from gripper");
       return false;
     }
+    RCLCPP_INFO(get_logger(), "SUCCESS: Cube detached from planning scene");
     if (goal_handle->is_canceling()) return false;
     rclcpp::sleep_for(1s); // Brief pause to let physics settle
 
-    // STEP 5 RAISE TO SAFE HEIGHT
-    feedback->status = "Moving up (Cartesian)...";
-    goal_handle->publish_feedback(feedback);
-    if (!move_up_cartesian(0.05))  // Move UP 5cm after releasing
-    {
-      RCLCPP_ERROR(get_logger(), "Failed to raise to safe height");
-      return false;
-    }
-    if (goal_handle->is_canceling()) return false;
+
+    //remove the object from the planning scene to avoid collision issues
+    RCLCPP_INFO(get_logger(), "Removing cube from planning scene collision objects");
+    planning_scene_.removeCollisionObjects({current_cube_id});
+    rclcpp::sleep_for(500ms); // Brief pause to let planning scene update
 
 
-    // FINISH
+    // STEP FINISH
+    RCLCPP_INFO(get_logger(), "=== PLACE SEQUENCE COMPLETE: cube_%s placed on table_%s ===", 
+                current_cube_id.c_str(), std::to_string(target_table_id).c_str());
     RCLCPP_INFO(get_logger(), "Place action completed successfully");
     return true;
   
@@ -230,12 +262,14 @@ private:
     geometry_msgs::msg::Pose place_pose;
     if (target_table_id == 1) {
       place_pose.position.x = 3.97 + 0.10;
-      place_pose.position.y = -1.10 - 0.10; //new offset (test also on other machines)
-      place_pose.position.z = 0.446 + 0.13;
+      //place_pose.position.y = -1.10 - 0.10; //old offset
+      place_pose.position.y = -1.10 - 0.05;
+      place_pose.position.z = 0.446 + 0.18;
     } else if (target_table_id == 2) {
-      place_pose.position.x = 4.56 - 0.10; // +0.10 was too far for the gripper to perform 'lift up'
-      place_pose.position.y = -0.50 + 0.10; //new offsets to try far from camera close corner to gripper
-      place_pose.position.z = 0.446 + 0.13;
+      //place_pose.position.x = 4.56 + 0.10; //old offset
+      place_pose.position.x = 4.56 - 0.05;
+      place_pose.position.y = -0.50 - 0.10;
+      place_pose.position.z = 0.446 + 0.18;
     } else {
       RCLCPP_ERROR(get_logger(), "Invalid target_table_id: %d", target_table_id);
       return std::nullopt;
