@@ -1,0 +1,109 @@
+/**:
+  ros__parameters:
+    # ====================================================================
+    # ROBOT TARGET JOINT POSITIONS
+    # Define named joint configurations for common robot poses
+    # All angles in radians
+    # ====================================================================
+    
+    # Home Position - Safe neutral pose
+    # Typically used as starting position and between operations
+    home_position:
+      shoulder_pan_joint: 0.0           # 0°
+      shoulder_lift_joint: -1.5708      # -90°
+      elbow_joint: 0.0                  # 0°
+      wrist_1_joint: -1.5708            # -90°
+      wrist_2_joint: 0.0                # 0°
+      wrist_3_joint: 0.0                # 0°
+    
+    # Active Position - Ready position near workspace
+    # Position from which pick operations begin
+    active_position:
+      shoulder_pan_joint: 0.0           # 0°
+      shoulder_lift_joint: -1.5708      # -90°
+      elbow_joint: 0.0                  # 0°
+      wrist_1_joint: -1.5708            # -90°
+      wrist_2_joint: 0.0                # 0°
+      wrist_3_joint: 0.0                # 0°
+    
+    # ====================================================================
+    # PICK ACTION CONFIGURATION
+    # Parameters for pick and grasp operations
+    # ====================================================================
+    
+    # Scene tuning (keep these consistent with your sim/world)
+    scene.table.x: 3.97
+    scene.table.y: -1.10
+    scene.table.z: 0.322
+
+    # Cube and AprilTag physical dimensions (meters)
+    dimensions.apriltag_size: 0.050        # AprilTag is 0.050x0.050m
+    dimensions.cube_width: 0.06            # Cube width (X)
+    dimensions.cube_depth: 0.06            # Cube depth (Y)
+    dimensions.cube_height: 0.1            # Cube height (Z)
+
+    # AprilTag to cube center transformation
+    # AprilTag pose is at cube center but needs lateral correction
+    apriltag.tag_to_cube_center_offset: 0.00  # Not used - tag is already at center
+    apriltag.lateral_x_offset: 0.030          # Lateral X correction (trial and error)
+
+    # ====================================================================
+    # GRASP CONFIGURATION - Easy switching between top and side grasps
+    # ====================================================================
+    
+    # Grasp Orientation (RPY, radians)
+    # For TOP grasp:   roll=0.0, pitch=3.1415 (π), yaw=0.0 (gripper pointing down)
+    # For SIDE grasp:  roll=0.0, pitch=-1.5707 (-π/2), yaw=0.0 (gripper horizontal)
+    grasp.orientation.roll: 0.0   
+    grasp.orientation.pitch: 3.1415     
+    grasp.orientation.yaw: 0.0
+
+    # Grasp Position Offsets from cube center (meters)
+    # For TOP grasp:   x=0.0, y=0.0, z=0.18 (tool length above cube)
+    # For SIDE grasp:  x=0.0, y=0.18 (tool length from side), z=0.15 (height offset)
+    grasp.offset.x: 0.0
+    grasp.offset.y: 0.0
+    grasp.offset.z: 0.18
+
+    # Pre-grasp Approach Offsets from grasp pose (meters)
+    # For TOP grasp:   x=0.0, y=0.0, z=0.20 (approach from above)
+    # For SIDE grasp:  x=0.0, y=0.0, z=0.20 (approach from above, then move sideways)
+    grasp.pregrasp_offset.x: 0.0
+    grasp.pregrasp_offset.y: 0.0
+    grasp.pregrasp_offset.z: 0.05
+
+    # Lift Motion Offsets from grasp pose (meters)
+    # Usually lift straight up in Z regardless of grasp type
+    grasp.lift_offset.x: 0.0
+    grasp.lift_offset.y: 0.0
+    grasp.lift_offset.z: 0.05
+
+    # Gripper joint targets
+    gripper.open: 0.0
+    gripper.closed: 0.098
+
+    # ====================================================================
+    # PLACE ACTION CONFIGURATION
+    # Parameters for place operations
+    # ====================================================================
+    
+    # Place pose orientation (RPY, radians) - gripper pointing down
+    place.orientation.roll: 0.0
+    place.orientation.pitch: 3.1415     # π radians (180°)
+    place.orientation.yaw: 0.0
+
+    # Table 1 place position (meters)
+    place.table_1.base_x: 3.97
+    place.table_1.base_y: -1.10
+    place.table_1.base_z: 0.446
+    place.table_1.offset_x: 0.10
+    place.table_1.offset_y: -0.05
+    place.table_1.offset_z: 0.18
+
+    # Table 2 place position (meters)
+    place.table_2.base_x: 4.56
+    place.table_2.base_y: -0.50
+    place.table_2.base_z: 0.446
+    place.table_2.offset_x: -0.05
+    place.table_2.offset_y: -0.10
+    place.table_2.offset_z: 0.18

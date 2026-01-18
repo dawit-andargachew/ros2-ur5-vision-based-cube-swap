@@ -309,7 +309,7 @@ private:
     params_.gripper_open = this->declare_parameter("gripper.open", params_.gripper_open);
     params_.gripper_closed = this->declare_parameter("gripper.closed", params_.gripper_closed);
 
-    // Robot target positions (home and active) - Declare here so they're available for constructor
+    // Robot target positions (home and active) - loaded from planning_configuration.yaml
     this->declare_parameter("home_position.shoulder_pan_joint", 0.0);
     this->declare_parameter("home_position.shoulder_lift_joint", -1.5708);
     this->declare_parameter("home_position.elbow_joint", 0.0);
@@ -317,12 +317,12 @@ private:
     this->declare_parameter("home_position.wrist_2_joint", 0.0);
     this->declare_parameter("home_position.wrist_3_joint", 0.0);
 
-    this->declare_parameter("active_position.shoulder_pan_joint", -1.64);
-    this->declare_parameter("active_position.shoulder_lift_joint", -1.46);
-    this->declare_parameter("active_position.elbow_joint", 1.12);
-    this->declare_parameter("active_position.wrist_1_joint", -1.48);
-    this->declare_parameter("active_position.wrist_2_joint", -1.37);
-    this->declare_parameter("active_position.wrist_3_joint", -0.38);
+    this->declare_parameter("active_position.shoulder_pan_joint", 0.0);
+    this->declare_parameter("active_position.shoulder_lift_joint", -1.5708);
+    this->declare_parameter("active_position.elbow_joint", 0.0);
+    this->declare_parameter("active_position.wrist_1_joint", -1.5708);
+    this->declare_parameter("active_position.wrist_2_joint", 0.0);
+    this->declare_parameter("active_position.wrist_3_joint", 0.0);
 
     RCLCPP_WARN(get_logger(), "=== FINAL PARAMETER SUMMARY ===");
     RCLCPP_WARN(

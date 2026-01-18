@@ -25,84 +25,101 @@ def generate_launch_description():
 		emulate_tty=False
 	)
 
-	# 2. Cube detector service (screen output)
-	cube_detector_node = Node(
-		package="group_6_assignment_2",
-		executable="cube_detector",
-		name="cube_detector",
-		output="screen",
-		parameters=[
-			{"use_sim_time": use_sim_time},
-		],
-	)
-
-	# 3. Pick action server (screen output for important logs)
-	pick_action_server_node = Node(
-        package="group_6_assignment_2",
-		executable="pick_action_server",
-		name="pick_action_server",
-		output="screen",
-		parameters=[
-            {"use_sim_time": use_sim_time},
-            PathJoinSubstitution(
-                [FindPackageShare("group_6_assignment_2"), "config", "pick_action_server.yaml"]
-            ),
-            PathJoinSubstitution(
-                [FindPackageShare("group_6_assignment_2"), "config", "robot_target_positions.yaml"]
-            ),
-            moveit_config.to_dict(),
-		],
-	)
-
-	# 4. Place action server (screen output for important logs)
-	place_action_server_node = Node(
-        package="group_6_assignment_2",
-		executable="place_action_server",
-		name="place_action_server",
-		output="screen",
-		parameters=[
-			{"use_sim_time": use_sim_time},
-            moveit_config.to_dict(),
-            PathJoinSubstitution(
-                [FindPackageShare("group_6_assignment_2"), "config", "pick_action_server.yaml"]
-            ),
-            PathJoinSubstitution(
-                [FindPackageShare("group_6_assignment_2"), "config", "robot_target_positions.yaml"]
-            )
-        ],
-    )
-
-	#5. Home action server (screen output for important logs)
-	home_action_server_node = Node(
-		package="group_6_assignment_2",
-		executable="home_action_server",
-		name="home_action_server",
-		output="screen",
-		parameters=[
-			{"use_sim_time": use_sim_time},
-			moveit_config.to_dict(),
-			PathJoinSubstitution(
-				[FindPackageShare("group_6_assignment_2"), "config", "robot_target_positions.yaml"]
+	# 2. Cube detector service (delayed 1s, screen output)
+	cube_detector_node = TimerAction(
+		period=1.0,
+		actions=[
+			Node(
+				package="group_6_assignment_2",
+				executable="cube_detector",
+				name="cube_detector",
+				output="screen",
+				parameters=[
+					{"use_sim_time": use_sim_time},
+				],
 			)
-		],
+		]
 	)
 
-
-	# 6. Color detector service (screen output)
-	color_detector_node = Node(
-		package="group_6_assignment_2",
-		executable="color_detector",
-		name="color_detector",
-		output="screen",
-		parameters=[
-			{"use_sim_time": use_sim_time},
-		],
+	# 3. Color detector service (delayed 2s, screen output)
+	color_detector_node = TimerAction(
+		period=2.0,
+		actions=[
+			Node(
+				package="group_6_assignment_2",
+				executable="color_detector",
+				name="color_detector",
+				output="screen",
+				parameters=[
+					{"use_sim_time": use_sim_time},
+				],
+			)
+		]
 	)
 
+	# 4. Home action server (delayed 3s, screen output for important logs)
+	home_action_server_node = TimerAction(
+		period=3.0,
+		actions=[
+			Node(
+				package="group_6_assignment_2",
+				executable="home_action_server",
+				name="home_action_server",
+				output="screen",
+				parameters=[
+					{"use_sim_time": use_sim_time},
+					moveit_config.to_dict(),
+					PathJoinSubstitution(
+						[FindPackageShare("group_6_assignment_2"), "config", "planning_configuration.yaml"]
+					)
+				],
+			)
+		]
+	)
 
-	# 7. Orchestrator (delayed start to allow servers to initialize, screen output)
+	# 5. Pick action server (delayed 4s, screen output for important logs)
+	pick_action_server_node = TimerAction(
+		period=4.0,
+		actions=[
+			Node(
+				package="group_6_assignment_2",
+				executable="pick_action_server",
+				name="pick_action_server",
+				output="screen",
+				parameters=[
+					{"use_sim_time": use_sim_time},
+					PathJoinSubstitution(
+						[FindPackageShare("group_6_assignment_2"), "config", "planning_configuration.yaml"]
+					),
+					moveit_config.to_dict(),
+				],
+			)
+		]
+	)
+
+	# 6. Place action server (delayed 5s, screen output for important logs)
+	place_action_server_node = TimerAction(
+		period=5.0,
+		actions=[
+			Node(
+				package="group_6_assignment_2",
+				executable="place_action_server",
+				name="place_action_server",
+				output="screen",
+				parameters=[
+					{"use_sim_time": use_sim_time},
+					moveit_config.to_dict(),
+					PathJoinSubstitution(
+						[FindPackageShare("group_6_assignment_2"), "config", "planning_configuration.yaml"]
+					)
+				],
+			)
+		]
+	)
+
+	# 7. Orchestrator (delayed 8s to allow all servers to initialize, screen output)
 	orchestrator_node = TimerAction(
-		period=5.0,  # Wait 5 seconds for all servers to start
+		period=8.0,  # Wait 8 seconds for all servers to start
 		actions=[
 			Node(
 				package="group_6_assignment_2",

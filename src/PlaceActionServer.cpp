@@ -56,6 +56,8 @@ public:
     configure_moveit(arm_group_, gripper_group_, config);
     apply_path_constraints(arm_group_, get_logger());  // ADDED: Apply path constraints
 
+    declare_and_get_parameters();
+
     action_server_ = rclcpp_action::create_server<Place>(
       this,
       "place",
@@ -77,6 +79,34 @@ private:
   // Debug visualization
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr place_pose_pub_;
 
+  // ======================
+  // Parameters
+  // ======================
+  struct PlaceParams
+  {
+    // Orientation
+    double orientation_roll = 0.0;
+    double orientation_pitch = 3.1415;
+    double orientation_yaw = 0.0;
+    
+    // Table 1
+    double table_1_base_x = 3.97;
+    double table_1_base_y = -1.10;
+    double table_1_base_z = 0.446;
+    double table_1_offset_x = 0.10;
+    double table_1_offset_y = -0.05;
+    double table_1_offset_z = 0.18;
+    
+    // Table 2
+    double table_2_base_x = 4.56;
+    double table_2_base_y = -0.50;
+    double table_2_base_z = 0.446;
+    double table_2_offset_x = -0.05;
+    double table_2_offset_y = -0.10;
+    double table_2_offset_z = 0.18;
+  } params_;
+
+  // ======================
   // Action callbacks
   rclcpp_action::GoalResponse handle_goal(
     const rclcpp_action::GoalUUID&,
@@ -223,27 +253,56 @@ private:
   
   }
 
+  // Declare and load parameters from YAML
+  void declare_and_get_parameters()
+  {
+    RCLCPP_INFO(get_logger(), "=== Loading Place Parameters from planning_configuration.yaml ===");
+    
+    // Orientation
+    params_.orientation_roll = this->declare_parameter("place.orientation.roll", params_.orientation_roll);
+    params_.orientation_pitch = this->declare_parameter("place.orientation.pitch", params_.orientation_pitch);
+    params_.orientation_yaw = this->declare_parameter("place.orientation.yaw", params_.orientation_yaw);
+    
+    // Table 1
+    params_.table_1_base_x = this->declare_parameter("place.table_1.base_x", params_.table_1_base_x);
+    params_.table_1_base_y = this->declare_parameter("place.table_1.base_y", params_.table_1_base_y);
+    params_.table_1_base_z = this->declare_parameter("place.table_1.base_z", params_.table_1_base_z);
+    params_.table_1_offset_x = this->declare_parameter("place.table_1.offset_x", params_.table_1_offset_x);
+    params_.table_1_offset_y = this->declare_parameter("place.table_1.offset_y", params_.table_1_offset_y);
+    params_.table_1_offset_z = this->declare_parameter("place.table_1.offset_z", params_.table_1_offset_z);
+    
+    // Table 2
+    params_.table_2_base_x = this->declare_parameter("place.table_2.base_x", params_.table_2_base_x);
+    params_.table_2_base_y = this->declare_parameter("place.table_2.base_y", params_.table_2_base_y);
+    params_.table_2_base_z = this->declare_parameter("place.table_2.base_z", params_.table_2_base_z);
+    params_.table_2_offset_x = this->declare_parameter("place.table_2.offset_x", params_.table_2_offset_x);
+    params_.table_2_offset_y = this->declare_parameter("place.table_2.offset_y", params_.table_2_offset_y);
+    params_.table_2_offset_z = this->declare_parameter("place.table_2.offset_z", params_.table_2_offset_z);
+    
+    RCLCPP_INFO(get_logger(), "Place parameters loaded successfully");
+  }
+
   // compute goal pose function returns a pose
   std::optional<geometry_msgs::msg::Pose> compute_goal_place_pose(
     uint8_t target_table_id)
   {  
     geometry_msgs::msg::Pose place_pose;
     if (target_table_id == 1) {
-      place_pose.position.x = 3.97 + 0.10;
-      place_pose.position.y = -1.10 - 0.05;
-      place_pose.position.z = 0.446 + 0.18;
+      place_pose.position.x = params_.table_1_base_x + params_.table_1_offset_x;
+      place_pose.position.y = params_.table_1_base_y + params_.table_1_offset_y;
+      place_pose.position.z = params_.table_1_base_z + params_.table_1_offset_z;
     } else if (target_table_id == 2) {
-      place_pose.position.x = 4.56 - 0.05;
-      place_pose.position.y = -0.50 - 0.10;
-      place_pose.position.z = 0.446 + 0.18;
+      place_pose.position.x = params_.table_2_base_x + params_.table_2_offset_x;
+      place_pose.position.y = params_.table_2_base_y + params_.table_2_offset_y;
+      place_pose.position.z = params_.table_2_base_z + params_.table_2_offset_z;
     } else {
       RCLCPP_ERROR(get_logger(), "Invalid target_table_id: %d", target_table_id);
       return std::nullopt;
     }
 
-    // set quaternion via RPY
+    // set quaternion via RPY from parameters
     tf2::Quaternion q;
-    q.setRPY(0.0, M_PI, 0.0);
+    q.setRPY(params_.orientation_roll, params_.orientation_pitch, params_.orientation_yaw);
     q.normalize();
 
     place_pose.orientation.x = q.x();
