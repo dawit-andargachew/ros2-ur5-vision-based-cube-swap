@@ -26,6 +26,10 @@
 #include "group_6_assignment_2/srv/get_cube_colors.hpp"
 #include "group_6_assignment_2/srv/get_cube_poses.hpp"
 
+
+#include <image_geometry/pinhole_camera_model.hpp>
+
+
 using GetCubeColors = group_6_assignment_2::srv::GetCubeColors;
 using GetCubePoses = group_6_assignment_2::srv::GetCubePoses;
 using std::placeholders::_1;
@@ -63,8 +67,8 @@ public:
         // 3. Service Client (Assigned to the Reentrant Group)
         cube_poses_client_ = this->create_client<GetCubePoses>(
             "get_cube_poses",
-            rmw_qos_profile_services_default,
-            client_cb_group_
+            rclcpp::ServicesQoS(),
+            client_cb_group_ //critical for calling service within another service call back
         );
 
         // 4. Subscriptions
@@ -87,8 +91,10 @@ public:
 
 private:
     static constexpr double MIN_AREA_THRESHOLD = 200.0;
+    static constexpr const char* CAMERA_FRAME_ID = "external_camera/link/rgb_camera";
     const std::vector<int32_t> TARGET_CUBE_IDS = {1, 10}; 
-
+    static constexpr double MATCH_THRESHOLD = 500.0; // pixels - adjust based on your camera resolution
+    static constexpr double MIN_DISTANCE_THRESHOLD = 10.0; // pixels - minimum to consider a match
     // --- Callbacks for Data ---
     void image_callback(const sensor_msgs::msg::Image::SharedPtr msg) {
         std::lock_guard<std::mutex> lock(image_mutex_);
@@ -97,7 +103,13 @@ private:
 
     void camera_info_callback(const sensor_msgs::msg::CameraInfo::SharedPtr msg) {
         std::lock_guard<std::mutex> lock(cam_info_mutex_);
-        camera_info_ = msg;
+        camera_info_ = std::make_shared<sensor_msgs::msg::CameraInfo>(*msg); // Deep copy
+
+        // if we have it we can unsubscribe
+        if (cam_info_sub_) {
+            cam_info_sub_.reset();
+            RCLCPP_INFO(this->get_logger(), "Camera Info received. Unsubscribed from Camera Info topic.");
+        }   
     }
 
     // --- Image Processing ---
@@ -151,68 +163,147 @@ private:
         return detections;
     }
 
-    // --- Math: Project World Point (3D) -> Image Pixel (2D) ---
-    bool project_world_to_pixel(const geometry_msgs::msg::Pose& world_pose, 
-                                cv::Point2d& output_pixel,
-                                const std::string& camera_frame_id) 
+    // 
+    bool project_camera_pose_to_pixel(const geometry_msgs::msg::Pose& pose_in_cam_frame,
+                                  const image_geometry::PinholeCameraModel& camera_model,
+                                  cv::Point2d& output_pixel) 
+    {   
+        try {
+            if (!camera_model.initialized()) {
+                RCLCPP_WARN(this->get_logger(), "Camera model not initialized for projection");
+                return false;
+            }
+            
+            // Check if point is behind camera (invalid for projection)
+            if (pose_in_cam_frame.position.z <= 0) {
+                RCLCPP_WARN(this->get_logger(), "Point behind camera (z=%.3f)", pose_in_cam_frame.position.z);
+                return false;
+            }
+            
+            cv::Point3d point_3d(
+                pose_in_cam_frame.position.x,
+                pose_in_cam_frame.position.y,
+                pose_in_cam_frame.position.z
+            );
+
+            output_pixel = camera_model.project3dToPixel(point_3d);
+            
+            RCLCPP_DEBUG(this->get_logger(), "Projected 3D point (%.3f, %.3f, %.3f) -> pixel (%.1f, %.1f)",
+                        point_3d.x, point_3d.y, point_3d.z,
+                        output_pixel.x, output_pixel.y);
+            
+            return true;
+        } catch (const std::exception& e) {
+            RCLCPP_ERROR(this->get_logger(), "Projection Error: %s", e.what());
+            return false;
+        }
+    }
+    
+
+    geometry_msgs::msg::Pose get_pose_in_camera_frame(const geometry_msgs::msg::Pose& world_pose) 
     {
         try {
-            // 1. Thread Safety & Data Copy
-            sensor_msgs::msg::CameraInfo::SharedPtr info_ptr;
-            {
-                std::lock_guard<std::mutex> lock(cam_info_mutex_);
-                info_ptr = camera_info_;
-            }
-
-            if (!info_ptr) {
-                RCLCPP_WARN(this->get_logger(), "No Camera Info available for projection.");
-                return false;
-            }
-
-            // 2. TF Transform: World -> Camera Frame
-            if (!tf_buffer_->canTransform(camera_frame_id, "world", tf2::TimePointZero, std::chrono::milliseconds(200))) {
-                RCLCPP_WARN(this->get_logger(), "Cannot transform World -> %s", camera_frame_id.c_str());
-                return false;
+            RCLCPP_INFO(this->get_logger(), "World pose: (%.3f, %.3f, %.3f)", 
+                       world_pose.position.x, world_pose.position.y, world_pose.position.z);
+            
+            // Check if transform is available
+            if (!tf_buffer_->canTransform(CAMERA_FRAME_ID, "world", tf2::TimePointZero, std::chrono::milliseconds(200))) {
+                RCLCPP_WARN(this->get_logger(), "Cannot transform world -> %s", CAMERA_FRAME_ID);
+                return geometry_msgs::msg::Pose(); // Return empty pose on failure
             }
             
+            // Lookup transform from world to camera frame
             geometry_msgs::msg::TransformStamped t_world_to_cam;
-            t_world_to_cam = tf_buffer_->lookupTransform(camera_frame_id, "world", tf2::TimePointZero);
+            t_world_to_cam = tf_buffer_->lookupTransform(CAMERA_FRAME_ID, "world", tf2::TimePointZero);
 
-            geometry_msgs::msg::Pose cam_pose;
-            tf2::doTransform(world_pose, cam_pose, t_world_to_cam);
+            RCLCPP_INFO(this->get_logger(), "Transform translation: (%.3f, %.3f, %.3f)", 
+                       t_world_to_cam.transform.translation.x, 
+                       t_world_to_cam.transform.translation.y, 
+                       t_world_to_cam.transform.translation.z);
 
-            // 3. Project using OpenCV (With Safe Data Copy)
-            std::vector<cv::Point3f> object_points;
-            object_points.push_back(cv::Point3f(cam_pose.position.x, cam_pose.position.y, cam_pose.position.z));
+            // Transform the pose
+            geometry_msgs::msg::Pose cam_frame_pose;
+            tf2::doTransform(world_pose, cam_frame_pose, t_world_to_cam);
             
-            // --- DEEP COPY TO AVOID CRASH ---
-            cv::Mat K(3, 3, CV_64F);
-            for(int i=0; i<9; i++) K.at<double>(i/3, i%3) = info_ptr->k[i];
-
-            cv::Mat D;
-            if (info_ptr->d.empty()) {
-                D = cv::Mat::zeros(1, 5, CV_64F);
-            } else {
-                D = cv::Mat(info_ptr->d.size(), 1, CV_64F);
-                for(size_t i=0; i<info_ptr->d.size(); i++) D.at<double>(i, 0) = info_ptr->d[i];
-            }
-
-            cv::Mat rvec = cv::Mat::zeros(3, 1, CV_64F);
-            cv::Mat tvec = cv::Mat::zeros(3, 1, CV_64F);
-
-            std::vector<cv::Point2d> image_points;
-            cv::projectPoints(object_points, rvec, tvec, K, D, image_points);
-
-            if (!image_points.empty()) {
-                output_pixel = image_points[0];
-                return true;
-            }
+            RCLCPP_INFO(this->get_logger(), "Camera frame pose: (%.3f, %.3f, %.3f)", 
+                       cam_frame_pose.position.x, cam_frame_pose.position.y, cam_frame_pose.position.z);
+            
+            return cam_frame_pose;
+            
         } catch (const tf2::TransformException& ex) {
-            RCLCPP_WARN(this->get_logger(), "Projection TF Error: %s", ex.what());
-        } catch (const cv::Exception& e) {
-            RCLCPP_ERROR(this->get_logger(), "OpenCV Error: %s", e.what());
+            RCLCPP_ERROR(this->get_logger(), "TF Transform Error: %s", ex.what());
+            return geometry_msgs::msg::Pose(); // Return empty pose on error
         }
-        return false;
+    }
+
+    bool get_camera_model(image_geometry::PinholeCameraModel& camera_model) 
+    {
+        std::lock_guard<std::mutex> lock(cam_info_mutex_);
+        if (!camera_info_) {
+            RCLCPP_WARN(this->get_logger(), "Camera info not available");
+            return false;
+        }
+        
+        // Deep copy to avoid issues
+        auto cam_info = std::make_shared<sensor_msgs::msg::CameraInfo>(*camera_info_);
+        if (!camera_model.fromCameraInfo(*cam_info)) {
+            RCLCPP_ERROR(this->get_logger(), "Failed to initialize camera model from camera info");
+            return false;
+        }
+        
+        RCLCPP_DEBUG(this->get_logger(), "Camera model initialized. Resolution: %dx%d",
+                    camera_model.fullResolution().width,
+                    camera_model.fullResolution().height);
+        
+        return true;
+    }
+
+    struct MatchResult {
+        std::string color;
+        double distance;
+    };
+
+    MatchResult find_closest_color_match(const cv::Point2d& projected_pixel, 
+                                     std::vector<DetectedObject>& color_blobs,
+                                     int cube_id)
+    {
+        double min_distance = std::numeric_limits<double>::max();
+        std::string best_color = "UNKNOWN";
+        int best_blob_index = -1;
+        
+        for (size_t i = 0; i < color_blobs.size(); i++) {
+            auto& blob = color_blobs[i];
+            if (blob.matched_id != -1) continue; // Already matched
+            
+            double dx = blob.x - projected_pixel.x;
+            double dy = blob.y - projected_pixel.y;
+            double dist = std::sqrt(dx*dx + dy*dy);
+            
+            RCLCPP_DEBUG(this->get_logger(), 
+                        "Cube %d -> %s blob at (%d,%d): distance %.1f px", 
+                        cube_id, blob.color.c_str(), blob.x, blob.y, dist);
+            
+            if (dist < min_distance && dist < MATCH_THRESHOLD) {
+                min_distance = dist;
+                best_color = blob.color;
+                best_blob_index = i;
+            }
+        }
+        
+        MatchResult result = {best_color, min_distance};
+        
+        if (best_color != "UNKNOWN" && min_distance <= MIN_DISTANCE_THRESHOLD) {
+            color_blobs[best_blob_index].matched_id = cube_id;
+            RCLCPP_INFO(this->get_logger(), 
+                    "Matched Cube %d -> %s (distance: %.1f px)", 
+                    cube_id, best_color.c_str(), min_distance);
+        } else if (best_color != "UNKNOWN") {
+            RCLCPP_WARN(this->get_logger(), 
+                    "Cube %d: closest blob is %s but distance %.1f > threshold %.1f", 
+                    cube_id, best_color.c_str(), min_distance, MIN_DISTANCE_THRESHOLD);
+        }
+        
+        return result;
     }
 
     // --- Service Callback ---
@@ -274,39 +365,38 @@ private:
             int id = poses_res->detected_ids[i];
             geometry_msgs::msg::Pose world_pose = poses_res->poses[i];
             
+            // Convert frame from world to camera frame
+            geometry_msgs::msg::Pose cam_frame_pose = get_pose_in_camera_frame(world_pose);
+
             cv::Point2d projected_pixel;
-            if (project_world_to_pixel(world_pose, projected_pixel, img_msg->header.frame_id)) {
+            
+            // Get camera model
+            image_geometry::PinholeCameraModel camera_model;
+            if (!get_camera_model(camera_model)) {
+                RCLCPP_WARN(this->get_logger(), "No camera info available for cube %d", id);
+                continue;
+            }
+            
+            if (!project_camera_pose_to_pixel(cam_frame_pose, camera_model, projected_pixel)) {
+                RCLCPP_WARN(this->get_logger(), "Failed to project cube %d to pixel", id);
+                continue;
+            }
+            
+            RCLCPP_INFO(this->get_logger(), "Cube %d projected to pixel (%.1f, %.1f)", id, projected_pixel.x, projected_pixel.y);
+            
+            // Find closest color blob to this projected pixel
+            auto match_result = find_closest_color_match(projected_pixel, color_blobs, id);
+            
+            if (match_result.color != "UNKNOWN") {
+                if (matched_count > 0) ss << " | ";
+                ss << "Cube " << id << ": " << match_result.color;
+                matched_count++;
                 
-                // --- DEBUGGING INFO START ---
-                RCLCPP_INFO(this->get_logger(), "Cube %d Projected Pixel: (%.1f, %.1f)", id, projected_pixel.x, projected_pixel.y);
-                
-                double min_dist = 250.0; // Increased threshold
-                std::string matched_color = "Unknown";
-                int best_blob_idx = -1;
-
-                for (size_t b = 0; b < color_blobs.size(); ++b) {
-                    if (color_blobs[b].matched_id != -1) continue; 
-
-                    double dx = color_blobs[b].x - projected_pixel.x;
-                    double dy = color_blobs[b].y - projected_pixel.y;
-                    double dist = std::sqrt(dx*dx + dy*dy);
-
-                    RCLCPP_INFO(this->get_logger(), "  -> Checking %s blob at (%.1f, %.1f) | Dist: %.1f", 
-                        color_blobs[b].color.c_str(), (double)color_blobs[b].x, (double)color_blobs[b].y, dist);
-
-                    if (dist < min_dist) {
-                        min_dist = dist;
-                        best_blob_idx = b;
-                        matched_color = color_blobs[b].color;
-                    }
-                }
-                // --- DEBUGGING INFO END ---
-                if (best_blob_idx != -1) {
-                    color_blobs[best_blob_idx].matched_id = id;
-                    if (matched_count > 0) ss << " | ";
-                    ss << "Cube " << id << ": " << matched_color;
-                    matched_count++;
-                }
+                RCLCPP_INFO(this->get_logger(), "Matched Cube %d -> %s (distance: %.1f px)", 
+                           id, match_result.color.c_str(), match_result.distance);
+            } else {
+                RCLCPP_WARN(this->get_logger(), "No color match found for Cube %d (min_dist: %.1f)", 
+                           id, match_result.distance);
             }
         }
 

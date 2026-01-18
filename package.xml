@@ -29,6 +29,7 @@
   <depend>sensor_msgs</depend>
   <depend>libopencv-dev</depend>
   <depend>apriltag_msgs</depend>
+  <depend>image_geometry</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

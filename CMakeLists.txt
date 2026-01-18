@@ -25,6 +25,7 @@ find_package(OpenCV REQUIRED)
 find_package(apriltag_msgs REQUIRED)
 find_package(behaviortree_cpp REQUIRED)
 find_package(ament_index_cpp REQUIRED)
+find_package(image_geometry REQUIRED)
 
 # ---------------------------------------------------------
 # Action Servers and Clients (Existing)
@@ -161,7 +162,7 @@ ament_target_dependencies(color_detector
     tf2_ros 
     tf2_geometry_msgs  # <--- NEW: Needed for projection math
     geometry_msgs      # <--- NEW: Needed for Poses
-    # apriltag_msgs    # REMOVED: No longer used here
+    image_geometry     # <--- NEW: Needed for PinholeCameraModel
 )
 target_link_libraries(color_detector ${OpenCV_LIBRARIES})
 configure_standard_node(color_detector)
