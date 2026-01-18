@@ -189,15 +189,15 @@ private:
     feedback->status = "Moving to pre-place pose";
     goal_handle->publish_feedback(feedback);
 
-    // Add orientation constraint to keep gripper pointing down during motion
+    // // Add orientation constraint to keep gripper pointing down during motion
     moveit_msgs::msg::OrientationConstraint oc;
     oc.header.frame_id = "world";
     oc.link_name = arm_group_.getEndEffectorLink();
     oc.orientation = place_pose.orientation;  // Keep target orientation (downward)
-    oc.absolute_x_axis_tolerance = 1.5708;  // Allow ~90 degrees deviation
-    oc.absolute_y_axis_tolerance = 1.5708;
-    oc.absolute_z_axis_tolerance = 1.5708;
-    oc.weight = 0.3; //with 1.0 fails all the time. 
+    oc.absolute_x_axis_tolerance = 3.14159;  // Allow ~180 degrees deviation, we just want to prevent a full 360 flip
+    oc.absolute_y_axis_tolerance = 3.14159;
+    oc.absolute_z_axis_tolerance = 3.14159;
+    oc.weight = 1.0; // we just want to suggest a little bit, not enforce strictly
 
     // new path constraints
     moveit_msgs::msg::Constraints old_path_constraints = arm_group_.getPathConstraints();
@@ -249,36 +249,6 @@ private:
     planning_scene_.removeCollisionObjects({current_cube_id});
     rclcpp::sleep_for(500ms); // Brief pause to let planning scene update
 
-
-    // STEP 5 RAISE TO SAFE HEIGHT
-    RCLCPP_INFO(get_logger(), "STEP 5: Raising arm to safe height (cartesian lift)");
-
-    // Small clearance move (joint or pose) to make the cartesian not fail hopefully (part of RAISE TO...)
-    /*
-    geometry_msgs::msg::Pose clearance_pose =
-        arm_group_.getCurrentPose().pose;
-
-    clearance_pose.position.z += 0.02;  // 2 cm
-
-    if (!motion_util::plan_and_execute_to_pose(
-            clearance_pose, arm_group_, get_logger()))
-    {
-      RCLCPP_ERROR(get_logger(), "Failed clearance move");
-      return false;
-    }
-    */
-
-    /*
-    feedback->status = "Moving up (Cartesian)...";
-    goal_handle->publish_feedback(feedback);
-    if (!move_up_cartesian(0.05))
-    {
-      RCLCPP_ERROR(get_logger(), "FAILED: Could not raise to safe height (cartesian lift)");
-      return false;
-    }
-    RCLCPP_INFO(get_logger(), "SUCCESS: Raised to safe height");
-    if (goal_handle->is_canceling()) return false;
-    */
 
     // STEP FINISH
     RCLCPP_INFO(get_logger(), "=== PLACE SEQUENCE COMPLETE: cube_%s placed on table_%s ===", 

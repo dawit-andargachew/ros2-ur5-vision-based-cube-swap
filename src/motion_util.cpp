@@ -24,7 +24,7 @@ namespace motion_util {
         
         // Use reliable planner - RRTstar handles constraints better than RRTConnect
         arm_mgi.setPlanningPipelineId("ompl");
-        // arm_mgi.setPlannerId("RRTstar"); // handles constraints better than RRTConnect
+        arm_mgi.setPlannerId("RRTstar"); // handles constraints better than RRTConnect
         
         // Set pose reference frame explicitly (Page 36, 65 documentation)
         arm_mgi.setPoseReferenceFrame(kWorldFrame);
@@ -62,10 +62,11 @@ namespace motion_util {
         
         // Tolerances: allow 0.5 above (reaches 0), large below (very negative allowed)
         pan_constraint.tolerance_above = 0.5;
-        pan_constraint.tolerance_below = 3.0;
+        pan_constraint.tolerance_below = 4.18879;
+        
         
         // Weight
-        pan_constraint.weight = 0.50;
+        pan_constraint.weight = 1.0;
 
         path_constraints.joint_constraints.push_back(pan_constraint);
 
