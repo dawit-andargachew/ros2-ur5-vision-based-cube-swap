@@ -13,7 +13,6 @@
 #include <moveit/planning_scene_interface/planning_scene_interface.hpp>
 
 #include "group_6_assignment_2/action/place.hpp"
-#include "group_6_assignment_2/srv/get_cube_poses.hpp"
 #include "group_6_assignment_2/motion_util.hpp"
 #include <tf2/LinearMath/Quaternion.h>
 
@@ -40,8 +39,6 @@ public:
     MotionConfig config;  // Use default configuration
     configure_moveit(arm_group_, gripper_group_, config);
     apply_path_constraints(arm_group_, get_logger());  // ADDED: Apply path constraints
-    cube_pose_client_ =
-      this->create_client<group_6_assignment_2::srv::GetCubePoses>("get_cube_poses");
 
     action_server_ = rclcpp_action::create_server<Place>(
       this,
@@ -62,14 +59,7 @@ private:
   // ======================
   moveit::planning_interface::MoveGroupInterface arm_group_;
   moveit::planning_interface::MoveGroupInterface gripper_group_;
-  moveit::planning_interface::PlanningSceneInterface planning_scene_; // useful only if we reintegrate 
-                                                                      // the defensive check at the start,
-                                                                      // pointless otherwise (CANCEL)
-
-  // ======================
-  // Perception
-  // ======================
-  rclcpp::Client<group_6_assignment_2::srv::GetCubePoses>::SharedPtr cube_pose_client_;
+  moveit::planning_interface::PlanningSceneInterface planning_scene_;
 
   // ======================
   // Debug visualization
@@ -133,17 +123,10 @@ private:
 
     auto feedback = std::make_shared<Place::Feedback>();
 
-    // check if grabbed_cube_id is attached if not fail and end action
-    feedback->status = "Verifying grabbed cube is attached";
+    feedback->status = "Starting";
     goal_handle->publish_feedback(feedback);
     const std::string current_cube_id = "cube_" + std::to_string(grabbed_cube_id);
-    /*
-    auto attached_objects = planning_scene_.getAttachedObjects();
-    if (attached_objects.find(current_cube_id) == attached_objects.end()) {
-      RCLCPP_ERROR(get_logger(), "Grabbed cube '%s' is not attached", current_cube_id.c_str());
-      return false;
-    }
-    */
+    
     //STEP 1 compute goal place pose
     RCLCPP_INFO(get_logger(), "=== PLACE SEQUENCE START: cube_%d -> table_%d ===", grabbed_cube_id, target_table_id);
     feedback->status = "Computing place pose";
@@ -160,25 +143,6 @@ private:
                 place_pose.position.x, place_pose.position.y, place_pose.position.z,
                 place_pose.orientation.x, place_pose.orientation.y, place_pose.orientation.z, place_pose.orientation.w);
 
-
-    /*
-    //go home
-    feedback->status = "Moving to home position before placing";
-    goal_handle->publish_feedback(feedback);
-    std::map<std::string, double> home_joint_config = {
-      {"shoulder_pan_joint", 0.0},
-      {"shoulder_lift_joint", -1.57}, 
-      {"elbow_joint", 0.0},
-      {"wrist_1_joint", -1.57},
-      {"wrist_2_joint", 0.0},
-      {"wrist_3_joint", 0.0}
-    }; 
-    if (!motion_util::move_to_joint_configuration(home_joint_config, arm_group_, "home", get_logger())) {
-      RCLCPP_ERROR(get_logger(), "Failed to move to home position before placing");
-      return false;
-    }
-    if (goal_handle->is_canceling()) return false;
-    */
   
     //STEP 2 move to pre-place pose
     RCLCPP_INFO(get_logger(), "STEP 2: Moving to pre-place pose with orientation constraint");
@@ -262,11 +226,9 @@ private:
     geometry_msgs::msg::Pose place_pose;
     if (target_table_id == 1) {
       place_pose.position.x = 3.97 + 0.10;
-      //place_pose.position.y = -1.10 - 0.10; //old offset
       place_pose.position.y = -1.10 - 0.05;
       place_pose.position.z = 0.446 + 0.18;
     } else if (target_table_id == 2) {
-      //place_pose.position.x = 4.56 + 0.10; //old offset
       place_pose.position.x = 4.56 - 0.05;
       place_pose.position.y = -0.50 - 0.10;
       place_pose.position.z = 0.446 + 0.18;
@@ -288,19 +250,6 @@ private:
     return place_pose;
 
   }
-
-  bool move_up_cartesian(double lift_distance)
-  {
-    std::vector<geometry_msgs::msg::Pose> waypoints;
-    geometry_msgs::msg::Pose lifted_pose = arm_group_.getCurrentPose().pose;
-    lifted_pose.position.z += lift_distance;
-    waypoints.push_back(lifted_pose);
-    motion_util::MotionConfig config;
-    config.cartesian_step_sizes = {0.01};
-    config.min_cartesian_fraction = 0.15;
-    return executeCartesianPath(waypoints, config, arm_group_, get_logger());
-  }
-
 
   void publish_debug_pose(
     const geometry_msgs::msg::Pose& pose,
