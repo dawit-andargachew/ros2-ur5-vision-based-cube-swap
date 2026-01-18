@@ -7,39 +7,11 @@ This repository contains the code for **Assignment 2** of the *Intelligent Robot
 - **Tharen Emmanuel Candi**
 - **Giuseppe Castellana**
 
----
-
-# **to be removed (Test color detection - 3 terminal)**
-```bash
-ros2 launch group_6_assignment_2 basic_a2_package.launch.py
-ros2 launch ir_launch assignment_2.launch.py
-ros2 service call /get_cube_colors group_6_assignment_2/srv/GetCubeColors {}
-```
-
-## Overview
-
-This package implements a complete pick-and-place system for swapping cubes between tables using a UR5 robotic arm with MoveIt2. The system consists of:
-
-- **CubeDetector**: Detects cube poses using AprilTag markers
-- **PickActionServer**: ROS2 action server for picking cubes
-- **PlaceActionServer**: ROS2 action server for placing cubes
-- **Orchestrator**: BehaviorTree-based high-level coordinator that swaps cubes between tables
-
----
-
-## TODO
-
-- Integrate ColorDetector into the Orchestrator/BehaviorTree logic
-- Integrate go to Home after second place in BehvaiourTree logic
-
----
-
 ## Building
 
 Navigate to your ROS2 workspace and build the package:
 
 ```bash
-cd ~/MASTERS/robotics/labs/ws_6_assignments
 colcon build --packages-select group_6_assignment_2
 source install/setup.bash
 ```
@@ -57,7 +29,7 @@ This launches all components including the BehaviorTree orchestrator that automa
 ros2 launch ir_launch assignment_2.launch.py
 ```
 
-**Terminal 2** - Launch complete system (cube detector, action servers, orchestrator):
+**Terminal 2** - Launch complete system (cube and color detector, action servers, orchestrator):
 ```bash
 ros2 launch group_6_assignment_2 orchestrator_full.launch.py use_sim_time:=true max_retries:=3
 ```
@@ -151,18 +123,6 @@ Orchestrator (BehaviorTree)
 
 ```
 
-### Action Interfaces
-
-**Pick Action**
-- Goal: `cube_id` (uint8)
-- Result: `success` (bool)
-- Feedback: `status` (string)
-
-**Place Action**
-- Goal: `grabbed_cube_id` (uint8), `target_table_id` (uint8)
-- Result: `success` (bool)
-- Feedback: `status` (string)
-
 ---
 
 ## BehaviorTree Logic
@@ -172,4 +132,3 @@ The swap logic is defined in [behaviour_trees/swap_logic.xml](behaviour_trees/sw
 1. Retry picking cube 1 and placing on table 2 (up to max_retries)
 2. If successful, retry picking cube 10 and placing on table 1 (up to max_retries)
 3. If either swap fails after retries, the entire operation fails
-
