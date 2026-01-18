@@ -1,3 +1,18 @@
+/**
+ * Node: place_action_client
+ * 
+ * type: action client node
+ * 
+ * purpose:
+ * Sends requests to the place action server to place cubes on target tables.
+ * Communicates the cube ID and target table ID for placement.
+ * Handles feedback and result messages from the place action server.
+ * 
+ * 
+ * actions:
+ *  Sends goals to the "place" action server with cube and target table IDs.
+ */
+
 #include <chrono>
 #include <memory>
 
