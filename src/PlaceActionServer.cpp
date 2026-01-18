@@ -179,11 +179,7 @@ private:
     }
     if (goal_handle->is_canceling()) return false;
     */
-
-    //STEP 2 move to pre-place pose
-    feedback->status = "Moving to pre-place pose";
-    goal_handle->publish_feedback(feedback);
-    
+  
     //STEP 2 move to pre-place pose
     RCLCPP_INFO(get_logger(), "STEP 2: Moving to pre-place pose with orientation constraint");
     feedback->status = "Moving to pre-place pose";
