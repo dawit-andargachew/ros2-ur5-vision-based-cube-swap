@@ -3,7 +3,7 @@
 <package format="3">
   <name>group_6_assignment_2</name>
   <version>0.0.0</version>
-  <description>assignment 2 swapping two cubes before returning using MoveIt for Intelligent Robotics</description>
+  <description>assignment 2 swapping two cubes before returning using MoveIt</description>
   <maintainer email="candi.tharen@gmail.com">tharen_candi</maintainer>
   <maintainer email="peppoipad@gmail.com">giuseppe_castellana</maintainer>
   <maintainer email="dawit.andargachew.asmare@gmail.com">dawit_andargachew</maintainer>
@@ -15,15 +15,15 @@
   <member_of_group>rosidl_interface_packages</member_of_group>
 
   <depend>rclcpp</depend>
-  <depend>moveit_ros_planning_interface</depend>
+  <depend>rclcpp_action</depend> <depend>moveit_ros_planning_interface</depend>
   <depend>moveit_core</depend>
   <depend>moveit_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>tf2</depend>
   <depend>tf2_ros</depend>
+  <depend>tf2_geometry_msgs</depend> 
   <depend>shape_msgs</depend>
   <depend>behaviortree_cpp</depend>
-  <depend>behaviortree_ros2</depend>
   <depend>ament_index_cpp</depend>
   <depend>cv_bridge</depend>
   <depend>sensor_msgs</depend>

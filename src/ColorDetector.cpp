@@ -1,70 +1,37 @@
 /**
  * Node: color_detector
- * 
- * Purpose:
- * Service node that detects and identifies the colors of cubes placed on the table.
- * Provides a service "get_cube_colors" that returns detected cube colors when called.
- * 
- * How It Works (Step-by-Step):
- * 
- * Step 1: Color Detection (Scans Entire Cube Surface)
- *   - Subscribes to camera feed (/rgb_camera/image)
- *   - Converts image to HSV color space for better color detection
- *   - Creates color masks for RED, BLUE, YELLOW, GREEN, PURPLE using HSV ranges
- *   - Finds contours (blobs) of each color in the entire image
- *   - Selects the largest blob per color (filters noise)
- *   - Records center position (x, y) of each color blob
- *   - Note: This detects the CUBE's colored surface, not the AprilTag
- * 
- * Step 2: AprilTag Detection (Separate System)
- *   - Subscribes to AprilTag detections (/apriltag/detections)
- *   - Receives tag IDs (1, 10, etc.) and their pixel positions from AprilTag node
- *   - AprilTag detection runs independently and detects the black/white tag markers
- * 
- * Step 3: Spatial Matching (Links Color to Tag ID)
- *   - For each detected color blob, finds the closest AprilTag detection
- *   - Calculates Euclidean distance: sqrt((x_blob - x_tag)² + (y_blob - y_tag)²)
- *   - Matches if distance < 150 pixels (configurable threshold)
- *   - Assigns the matched AprilTag ID to the color blob
- * 
- * Step 4: TF Validation (Ensures IDs Exist)
- *   - Validates matched AprilTag IDs exist in TF tree (same as cube_detector)
- *   - Checks if transform "world" → "tag36h11:<id>" exists
- *   - Invalidates matches that don't exist in TF
- * 
- * Step 5: Response Formatting
- *   - Formats message like "Cube 1: RED | Cube 10: BLUE"
- *   - Uses actual detected AprilTag IDs (not hardcoded)
- *   - Returns only successfully matched cubes
+ * * fixes included:
+ * 1. OpenCV Assertion Crash (Deep Copy of CameraInfo)
+ * 2. Service Deadlock (Reentrant Callback Group)
+ * 3. Matching Logic (Increased Threshold + Debug Logs)
  */
 
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/image.hpp>
+#include <sensor_msgs/msg/camera_info.hpp>
 #include <cv_bridge/cv_bridge.hpp>
 #include <opencv2/opencv.hpp>
-#include <apriltag_msgs/msg/april_tag_detection_array.hpp>
-#include <apriltag_msgs/msg/april_tag_detection.hpp>
 #include <tf2/time.h>
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp> 
 #include <chrono>
 #include <vector>
 #include <string>
 #include <sstream>
 #include <algorithm>
 #include <mutex>
-#include <set>
 #include <cmath>
-#include <limits>
 
 #include "group_6_assignment_2/srv/get_cube_colors.hpp"
 #include "group_6_assignment_2/srv/get_cube_poses.hpp"
 
 using GetCubeColors = group_6_assignment_2::srv::GetCubeColors;
+using GetCubePoses = group_6_assignment_2::srv::GetCubePoses;
 using std::placeholders::_1;
 using std::placeholders::_2;
 
-// Structure to define a color with its Name and HSV Ranges
+// --- Data Structures ---
 struct ColorDef {
     std::string name;
     std::vector<std::pair<cv::Scalar, cv::Scalar>> ranges;
@@ -72,10 +39,10 @@ struct ColorDef {
 
 struct DetectedObject {
     std::string color;
-    int x;
-    int y;  // Added for spatial matching
+    int x; // Pixel U
+    int y; // Pixel V
     double area;
-    int apriltag_id;  // Will store the matched AprilTag ID, -1 if not matched
+    int matched_id; // -1 if not matched to a cube ID
 };
 
 class ColorDetector : public rclcpp::Node
@@ -83,301 +50,302 @@ class ColorDetector : public rclcpp::Node
 public:
     ColorDetector() : Node("color_detector")
     {
-        // Create the service
+        // 1. Create a Reentrant Callback Group for the Service Client
+        // Critical: Prevents deadlock when calling a service from within a service
+        client_cb_group_ = this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
+
+        // 2. Service Server (Standard Default Group)
         service_ = this->create_service<GetCubeColors>(
             "get_cube_colors",
             std::bind(&ColorDetector::handle_get_cube_colors, this, _1, _2)
         );
 
-        // Subscribe to camera feed in background to maintain latest image
+        // 3. Service Client (Assigned to the Reentrant Group)
+        cube_poses_client_ = this->create_client<GetCubePoses>(
+            "get_cube_poses",
+            rmw_qos_profile_services_default,
+            client_cb_group_
+        );
+
+        // 4. Subscriptions
         rclcpp::QoS qos_profile = rclcpp::SensorDataQoS();
+        
         subscription_ = this->create_subscription<sensor_msgs::msg::Image>(
             "/rgb_camera/image", qos_profile,
             std::bind(&ColorDetector::image_callback, this, std::placeholders::_1));
+
+        cam_info_sub_ = this->create_subscription<sensor_msgs::msg::CameraInfo>(
+            "/rgb_camera/camera_info", qos_profile,
+            std::bind(&ColorDetector::camera_info_callback, this, std::placeholders::_1));
         
-        // Subscribe to AprilTag detections to get tag positions in image
-        rclcpp::QoS apriltag_qos(1);
-        apriltag_subscription_ = this->create_subscription<apriltag_msgs::msg::AprilTagDetectionArray>(
-            "/apriltag/detections", apriltag_qos,
-            std::bind(&ColorDetector::apriltag_callback, this, std::placeholders::_1));
-        
-        // Initialize TF2 buffer and listener for validating AprilTag IDs
+        // 5. TF Buffer
         tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
         tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
-        
-        RCLCPP_INFO(this->get_logger(), "Cube Color Detector Service is ready.");
-        RCLCPP_INFO(this->get_logger(), "Subscribed to /apriltag/detections for spatial matching");
+
+        RCLCPP_INFO(this->get_logger(), "ColorDetector ready. Waiting for Camera Info...");
     }
 
 private:
-
-    // Define the threshold constant here
     static constexpr double MIN_AREA_THRESHOLD = 200.0;
-    static constexpr int FIND_TF_TIMEOUT_MS = 200;
+    const std::vector<int32_t> TARGET_CUBE_IDS = {1, 10}; 
 
-    void image_callback(const sensor_msgs::msg::Image::SharedPtr msg)
-    {
-        // Store the latest image (thread-safe)
-        std::lock_guard<std::mutex> lock(latest_image_mutex_);
+    // --- Callbacks for Data ---
+    void image_callback(const sensor_msgs::msg::Image::SharedPtr msg) {
+        std::lock_guard<std::mutex> lock(image_mutex_);
         latest_image_ = msg;
     }
 
-    void apriltag_callback(const apriltag_msgs::msg::AprilTagDetectionArray::SharedPtr msg)
-    {
-        // Store the latest AprilTag detections (thread-safe)
-        std::lock_guard<std::mutex> lock(latest_apriltag_mutex_);
-        latest_apriltag_detections_ = msg;
+    void camera_info_callback(const sensor_msgs::msg::CameraInfo::SharedPtr msg) {
+        std::lock_guard<std::mutex> lock(cam_info_mutex_);
+        camera_info_ = msg;
     }
 
-    std::vector<DetectedObject> detect_colors_in_image(const cv::Mat& frame)
-    {
+    // --- Image Processing ---
+    std::vector<DetectedObject> detect_colors_in_image(const cv::Mat& frame) {
         cv::Mat hsv;
         cv::cvtColor(frame, hsv, cv::COLOR_BGR2HSV);
 
+        // Defined robust colors with slightly wider ranges for safety
         std::vector<ColorDef> colors = {
-            {"RED",    {{ {cv::Scalar(0, 120, 70), cv::Scalar(8, 255, 255)}, {cv::Scalar(170, 120, 70), cv::Scalar(180, 255, 255)} }}},
-            
-            {"YELLOW", {{ {cv::Scalar(22, 100, 100), cv::Scalar(33, 255, 255)} }}},
-            {"GREEN",  {{ {cv::Scalar(38, 60, 60), cv::Scalar(85, 255, 255)} }}},
-            {"BLUE",   {{ {cv::Scalar(90, 60, 60), cv::Scalar(125, 255, 255)} }}},
+            {"RED",    {{ {cv::Scalar(0, 100, 50), cv::Scalar(10, 255, 255)}, {cv::Scalar(160, 100, 50), cv::Scalar(180, 255, 255)} }}},
+            {"YELLOW", {{ {cv::Scalar(20, 100, 50), cv::Scalar(35, 255, 255)} }}},
+            {"GREEN",  {{ {cv::Scalar(40, 50, 50), cv::Scalar(85, 255, 255)} }}},
+            {"BLUE",   {{ {cv::Scalar(90, 50, 50), cv::Scalar(130, 255, 255)} }}},
             {"PURPLE", {{ {cv::Scalar(135, 50, 50), cv::Scalar(165, 255, 255)} }}}
         };
 
         std::vector<DetectedObject> detections;
 
-        // Iterate through all defined colors
         for (const auto& c : colors) {
             cv::Mat mask = cv::Mat::zeros(hsv.size(), CV_8UC1);
-            
-            // Combine masks if a color has multiple ranges (like Red)
             for (const auto& range : c.ranges) {
                 cv::Mat temp;
                 cv::inRange(hsv, range.first, range.second, temp);
                 cv::add(mask, temp, mask);
             }
 
-            // Find Contours (Blobs) in the mask
+            // Clean up noise (Open/Close)
+            cv::morphologyEx(mask, mask, cv::MORPH_OPEN, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5,5)));
+
             std::vector<std::vector<cv::Point>> contours;
             cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
             
-            // Find the single largest blob for this color to avoid noise
             double max_area = 0;
-            cv::Rect max_rect;
-            int max_x = -1;
-            int max_y = -1;
-            
+            cv::Point center;
+            bool found = false;
+
             for (const auto& contour : contours) {
                 double area = cv::contourArea(contour);
                 if (area > max_area) {
                     max_area = area;
-                    max_rect = cv::boundingRect(contour);
-                    max_x = max_rect.x + max_rect.width / 2;
-                    max_y = max_rect.y + max_rect.height / 2;
+                    auto rect = cv::boundingRect(contour);
+                    center = cv::Point(rect.x + rect.width/2, rect.y + rect.height/2);
+                    found = true;
                 }
             }
 
-            // Filter: Must be larger than `MIN_AREA_THRESHOLD` pixels to be considered a real object
-            if (max_area > MIN_AREA_THRESHOLD) {
-                detections.push_back({c.name, max_x, max_y, max_area, -1});  // -1 means not matched yet
+            if (found && max_area > MIN_AREA_THRESHOLD) {
+                detections.push_back({c.name, center.x, center.y, max_area, -1});
             }
         }
-
-        // Sort detections from Left to Right (by X-coordinate)
-        // This gives us a consistent order (Cube 1 is usually left, Cube 10 right).
-        std::sort(detections.begin(), detections.end(), 
-            [](const DetectedObject& a, const DetectedObject& b) {
-                return a.x < b.x; 
-            });
-
         return detections;
     }
 
+    // --- Math: Project World Point (3D) -> Image Pixel (2D) ---
+    bool project_world_to_pixel(const geometry_msgs::msg::Pose& world_pose, 
+                                cv::Point2d& output_pixel,
+                                const std::string& camera_frame_id) 
+    {
+        try {
+            // 1. Thread Safety & Data Copy
+            sensor_msgs::msg::CameraInfo::SharedPtr info_ptr;
+            {
+                std::lock_guard<std::mutex> lock(cam_info_mutex_);
+                info_ptr = camera_info_;
+            }
+
+            if (!info_ptr) {
+                RCLCPP_WARN(this->get_logger(), "No Camera Info available for projection.");
+                return false;
+            }
+
+            // 2. TF Transform: World -> Camera Frame
+            if (!tf_buffer_->canTransform(camera_frame_id, "world", tf2::TimePointZero, std::chrono::milliseconds(200))) {
+                RCLCPP_WARN(this->get_logger(), "Cannot transform World -> %s", camera_frame_id.c_str());
+                return false;
+            }
+            
+            geometry_msgs::msg::TransformStamped t_world_to_cam;
+            t_world_to_cam = tf_buffer_->lookupTransform(camera_frame_id, "world", tf2::TimePointZero);
+
+            geometry_msgs::msg::Pose cam_pose;
+            tf2::doTransform(world_pose, cam_pose, t_world_to_cam);
+
+            // 3. Project using OpenCV (With Safe Data Copy)
+            std::vector<cv::Point3f> object_points;
+            object_points.push_back(cv::Point3f(cam_pose.position.x, cam_pose.position.y, cam_pose.position.z));
+            
+            // --- DEEP COPY TO AVOID CRASH ---
+            cv::Mat K(3, 3, CV_64F);
+            for(int i=0; i<9; i++) K.at<double>(i/3, i%3) = info_ptr->k[i];
+
+            cv::Mat D;
+            if (info_ptr->d.empty()) {
+                D = cv::Mat::zeros(1, 5, CV_64F);
+            } else {
+                D = cv::Mat(info_ptr->d.size(), 1, CV_64F);
+                for(size_t i=0; i<info_ptr->d.size(); i++) D.at<double>(i, 0) = info_ptr->d[i];
+            }
+
+            cv::Mat rvec = cv::Mat::zeros(3, 1, CV_64F);
+            cv::Mat tvec = cv::Mat::zeros(3, 1, CV_64F);
+
+            std::vector<cv::Point2d> image_points;
+            cv::projectPoints(object_points, rvec, tvec, K, D, image_points);
+
+            if (!image_points.empty()) {
+                output_pixel = image_points[0];
+                return true;
+            }
+        } catch (const tf2::TransformException& ex) {
+            RCLCPP_WARN(this->get_logger(), "Projection TF Error: %s", ex.what());
+        } catch (const cv::Exception& e) {
+            RCLCPP_ERROR(this->get_logger(), "OpenCV Error: %s", e.what());
+        }
+        return false;
+    }
+
+    // --- Service Callback ---
     void handle_get_cube_colors(
         const std::shared_ptr<GetCubeColors::Request> request,
         std::shared_ptr<GetCubeColors::Response> response)
     {
-        RCLCPP_INFO(this->get_logger(), "Received request for cube colors.");
+        (void)request; 
+        RCLCPP_INFO(this->get_logger(), "Processing GetCubeColors request...");
 
-        response->success = false;
-        response->message = "";
-
-        // Get the latest image (thread-safe)
-        sensor_msgs::msg::Image::SharedPtr latest_image;
+        // 1. Check Data
+        sensor_msgs::msg::Image::SharedPtr img_msg;
         {
-            std::lock_guard<std::mutex> lock(latest_image_mutex_);
-            if (!latest_image_) {
-                response->success = false;
-                response->message = "No image received yet. Please wait for camera feed.";
-                RCLCPP_WARN(this->get_logger(), "%s", response->message.c_str());
-                return;
-            }
-            latest_image = latest_image_;
+            std::lock_guard<std::mutex> lock(image_mutex_);
+            img_msg = latest_image_;
         }
-
-        try {
-            cv::Mat frame = cv_bridge::toCvCopy(latest_image, "bgr8")->image;
-            
-            // Detect colors in the image
-            std::vector<DetectedObject> detections = detect_colors_in_image(frame);
-
-            if (detections.empty()) {
-                response->success = false;
-                response->message = "No cubes detected in the image.";
-                RCLCPP_WARN(this->get_logger(), "%s", response->message.c_str());
-                return;
-            }
-
-            // Get latest AprilTag detections (thread-safe)
-            apriltag_msgs::msg::AprilTagDetectionArray::SharedPtr apriltag_detections;
-            {
-                std::lock_guard<std::mutex> lock(latest_apriltag_mutex_);
-                apriltag_detections = latest_apriltag_detections_;
-            }
-
-            if (!apriltag_detections || apriltag_detections->detections.empty()) {
-                response->success = false;
-                response->message = "No AprilTag detections available. Make sure AprilTag detection is running and tags are visible.";
-                RCLCPP_WARN(this->get_logger(), "%s", response->message.c_str());
-                return;
-            }
-
-            RCLCPP_INFO(this->get_logger(), "Found %zu AprilTag detections in image", 
-                       apriltag_detections->detections.size());
-            for (const auto& tag : apriltag_detections->detections) {
-                RCLCPP_INFO(this->get_logger(), "  - Tag ID: %d at (%.1f, %.1f)", 
-                           tag.id, tag.centre.x, tag.centre.y);
-            }
-            
-            // Match color blobs with AprilTag detections based on spatial proximity
-            match_color_blobs_with_apriltags(detections, apriltag_detections);
-            
-            // Validate matched IDs using TF transforms
-            validate_apriltag_ids_with_tf(detections);
-
-            // Format message using actual AprilTag IDs
-            std::stringstream message_stream;
-            int count = 0;
-            for (const auto& obj : detections) {
-                // Stop after finding the two main cubes
-                if (count >= 2) break;
-
-                if (count > 0) message_stream << " | ";
-                
-                // Use AprilTag ID if matched, otherwise skip
-                if (obj.apriltag_id >= 0) {
-                    message_stream << "Cube " << obj.apriltag_id << ": " << obj.color;
-                    count++;
-                } else {
-                    RCLCPP_WARN(this->get_logger(), "No AprilTag ID assigned to %s blob, skipping.", 
-                                obj.color.c_str());
-                }
-            }
-            
-            if (count == 0) {
-                response->success = false;
-                response->message = "No cubes could be matched with available AprilTag IDs.";
-                RCLCPP_WARN(this->get_logger(), "%s", response->message.c_str());
-                return;
-            }
-
-            response->success = true;
-            response->message = message_stream.str();
-            
-            RCLCPP_INFO(this->get_logger(), "Detected: [%s]", response->message.c_str());
-        }
-        catch (cv_bridge::Exception& e) {
+        if (!img_msg) {
             response->success = false;
-            response->message = "cv_bridge exception: " + std::string(e.what());
-            RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
+            response->message = "No image received yet.";
+            return;
         }
-    }
 
-    void match_color_blobs_with_apriltags(
-        std::vector<DetectedObject>& color_detections,
-        const apriltag_msgs::msg::AprilTagDetectionArray::SharedPtr& apriltag_detections)
-    {
-        // Track which tags have been matched to ensure one-to-one matching
-        std::set<int> matched_tag_ids;
+        // 2. Call CubeDetector Service
+        if (!cube_poses_client_->wait_for_service(std::chrono::seconds(1))) {
+            response->success = false;
+            response->message = "CubeDetector service not available.";
+            return;
+        }
+
+        auto poses_req = std::make_shared<GetCubePoses::Request>();
+        poses_req->target_ids = TARGET_CUBE_IDS;
+
+        auto future_result = cube_poses_client_->async_send_request(poses_req);
         
-        // Match each color blob with the closest AprilTag detection based on pixel distance
-        // Uses spatial proximity - NO assumption about left/right position
-        for (auto& color_obj : color_detections) {
-            double min_distance = std::numeric_limits<double>::max();
-            int matched_tag_id = -1;
+        // Wait for result
+        if (future_result.wait_for(std::chrono::seconds(2)) != std::future_status::ready) {
+             response->success = false;
+             response->message = "Timed out waiting for CubeDetector.";
+             RCLCPP_ERROR(this->get_logger(), "Service call timed out.");
+             return;
+        }
+        
+        auto poses_res = future_result.get();
+        if (!poses_res->success) {
+            response->success = false;
+            response->message = "CubeDetector failed: " + poses_res->message;
+            return;
+        }
 
-            for (const auto& tag : apriltag_detections->detections) {
-                // Skip tags that have already been matched (one-to-one matching)
-                if (matched_tag_ids.find(tag.id) != matched_tag_ids.end()) {
-                    continue;
+        // 3. Process Image
+        cv::Mat frame = cv_bridge::toCvCopy(img_msg, "bgr8")->image;
+        auto color_blobs = detect_colors_in_image(frame);
+
+        // 4. Match
+        std::stringstream ss;
+        int matched_count = 0;
+
+        for (size_t i = 0; i < poses_res->detected_ids.size(); ++i) {
+            int id = poses_res->detected_ids[i];
+            geometry_msgs::msg::Pose world_pose = poses_res->poses[i];
+            
+            cv::Point2d projected_pixel;
+            if (project_world_to_pixel(world_pose, projected_pixel, img_msg->header.frame_id)) {
+                
+                // --- DEBUGGING INFO START ---
+                RCLCPP_INFO(this->get_logger(), "Cube %d Projected Pixel: (%.1f, %.1f)", id, projected_pixel.x, projected_pixel.y);
+                
+                double min_dist = 250.0; // Increased threshold
+                std::string matched_color = "Unknown";
+                int best_blob_idx = -1;
+
+                for (size_t b = 0; b < color_blobs.size(); ++b) {
+                    if (color_blobs[b].matched_id != -1) continue; 
+
+                    double dx = color_blobs[b].x - projected_pixel.x;
+                    double dy = color_blobs[b].y - projected_pixel.y;
+                    double dist = std::sqrt(dx*dx + dy*dy);
+
+                    RCLCPP_INFO(this->get_logger(), "  -> Checking %s blob at (%.1f, %.1f) | Dist: %.1f", 
+                        color_blobs[b].color.c_str(), (double)color_blobs[b].x, (double)color_blobs[b].y, dist);
+
+                    if (dist < min_dist) {
+                        min_dist = dist;
+                        best_blob_idx = b;
+                        matched_color = color_blobs[b].color;
+                    }
                 }
-
-                // Calculate Euclidean distance between color blob center and AprilTag center
-                double dx = color_obj.x - tag.centre.x;
-                double dy = color_obj.y - tag.centre.y;
-                double distance = std::sqrt(dx * dx + dy * dy);
-
-                // Match with the closest tag within a reasonable threshold (e.g., 150 pixels)
-                // can be adjusted based on the camera resolution and setup, but for our case we used 150.
-                constexpr double MAX_MATCH_DISTANCE = 150.0;
-                if (distance < min_distance && distance < MAX_MATCH_DISTANCE) {
-                    min_distance = distance;
-                    matched_tag_id = tag.id;
+                // --- DEBUGGING INFO END ---
+                if (best_blob_idx != -1) {
+                    color_blobs[best_blob_idx].matched_id = id;
+                    if (matched_count > 0) ss << " | ";
+                    ss << "Cube " << id << ": " << matched_color;
+                    matched_count++;
                 }
-            }
-
-            if (matched_tag_id >= 0) {
-                color_obj.apriltag_id = matched_tag_id;
-                matched_tag_ids.insert(matched_tag_id);  // Mark this tag as used
-                RCLCPP_INFO(this->get_logger(), 
-                           "Matched %s color blob at (%d, %d) with AprilTag ID %d (distance: %.2f pixels)",
-                           color_obj.color.c_str(), color_obj.x, color_obj.y, matched_tag_id, min_distance);
-            } else {
-                RCLCPP_WARN(this->get_logger(), 
-                           "No AprilTag match found for %s color blob at (%d, %d) within threshold",
-                           color_obj.color.c_str(), color_obj.x, color_obj.y);
             }
         }
-    }
 
-    void validate_apriltag_ids_with_tf(std::vector<DetectedObject>& color_detections)
-    {
-        // Validate that matched AprilTag IDs actually exist in the TF tree (like CubeDetector does)
-        for (auto& color_obj : color_detections) {
-            if (color_obj.apriltag_id >= 0) {
-                std::string tag_frame = "tag36h11:" + std::to_string(color_obj.apriltag_id);
-                
-                // Check if transform exists (same logic as CubeDetector)
-                if (!tf_buffer_->canTransform("world", tag_frame, tf2::TimePointZero, 
-                                             std::chrono::milliseconds(FIND_TF_TIMEOUT_MS))) {
-                    RCLCPP_WARN(this->get_logger(), 
-                               "AprilTag ID %d matched but not found in TF tree. Invalidating match.",
-                               color_obj.apriltag_id);
-                    color_obj.apriltag_id = -1;  // Invalidate the match
-                } else {
-                    RCLCPP_DEBUG(this->get_logger(), 
-                                "Validated AprilTag ID %d exists in TF tree for %s cube",
-                                color_obj.apriltag_id, color_obj.color.c_str());
-                }
-            }
+        if (matched_count == 0) {
+            response->success = false;
+            response->message = "Could not match any cubes to colors.";
+            RCLCPP_WARN(this->get_logger(), "Matching failed. See logs for distances.");
+        } else {
+            response->success = true;
+            response->message = ss.str();
+            RCLCPP_INFO(this->get_logger(), "Result: %s", response->message.c_str());
         }
     }
 
     rclcpp::Service<GetCubeColors>::SharedPtr service_;
+    rclcpp::Client<GetCubePoses>::SharedPtr cube_poses_client_;
+    rclcpp::CallbackGroup::SharedPtr client_cb_group_; 
+    
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr subscription_;
-    rclcpp::Subscription<apriltag_msgs::msg::AprilTagDetectionArray>::SharedPtr apriltag_subscription_;
+    rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr cam_info_sub_;
+    
     std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+
     sensor_msgs::msg::Image::SharedPtr latest_image_;
-    apriltag_msgs::msg::AprilTagDetectionArray::SharedPtr latest_apriltag_detections_;
-    std::mutex latest_image_mutex_;
-    std::mutex latest_apriltag_mutex_;
+    sensor_msgs::msg::CameraInfo::SharedPtr camera_info_;
+    std::mutex image_mutex_;
+    std::mutex cam_info_mutex_;
 };
 
 int main(int argc, char * argv[])
 {
     rclcpp::init(argc, argv);
     auto node = std::make_shared<ColorDetector>();
-    rclcpp::spin(node);
+    
+    rclcpp::executors::MultiThreadedExecutor executor;
+    executor.add_node(node);
+    executor.spin();
+    
     rclcpp::shutdown();
     return 0;
 }

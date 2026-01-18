@@ -7,31 +7,30 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-# uncomment the following section in order to fill in
-# further dependencies manually.
-# find_package(<dependency> REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_action REQUIRED)
 find_package(moveit_ros_planning_interface REQUIRED)
 find_package(moveit_core REQUIRED)
 find_package(moveit_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
+# ADDED: Required for doTransform
+find_package(tf2_geometry_msgs REQUIRED) 
 find_package(rosidl_default_generators REQUIRED)
 find_package(shape_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(apriltag_msgs REQUIRED)
-find_package(rclcpp_action REQUIRED)
 find_package(behaviortree_cpp REQUIRED)
-#find_package(behaviortree_ros2 REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 
-# find_package(ament_cmake_python REQUIRED)
-# Create executable 'pick_action_server' from 'src/PickActionServer.cpp'
+# ---------------------------------------------------------
+# Action Servers and Clients (Existing)
+# ---------------------------------------------------------
+
 add_executable(pick_action_server src/PickActionServer.cpp)
-# Link necessary libraries
 ament_target_dependencies(pick_action_server
   rclcpp
   moveit_ros_planning_interface
@@ -42,15 +41,10 @@ ament_target_dependencies(pick_action_server
   shape_msgs
 )
 
-# Create executable 'pick_action_client' from 'src/PickActionClient.cpp'
 add_executable(pick_action_client src/PickActionClient.cpp)
-ament_target_dependencies(pick_action_client
-  rclcpp
-  rclcpp_action
-)
+ament_target_dependencies(pick_action_client rclcpp rclcpp_action)
 
 add_executable(place_action_server src/PlaceActionServer.cpp)
-# Link necessary libraries
 ament_target_dependencies(place_action_server
   rclcpp
   rclcpp_action
@@ -63,15 +57,9 @@ ament_target_dependencies(place_action_server
 )
 
 add_executable(place_action_client src/PlaceActionClient.cpp)
-ament_target_dependencies(place_action_client
-  rclcpp
-  rclcpp_action
-  geometry_msgs
-  tf2
-)
+ament_target_dependencies(place_action_client rclcpp rclcpp_action geometry_msgs tf2)
 
 add_executable(home_action_server src/HomeActionServer.cpp)
-# Link necessary libraries
 ament_target_dependencies(home_action_server
   rclcpp
   rclcpp_action
@@ -81,13 +69,11 @@ ament_target_dependencies(home_action_server
 )
 
 add_executable(home_action_client src/HomeActionClient.cpp)
-# Link necessary libraries
-ament_target_dependencies(home_action_client
-  rclcpp
-  rclcpp_action
-)
+ament_target_dependencies(home_action_client rclcpp rclcpp_action)
 
-# Add the motion_util library
+# ---------------------------------------------------------
+# Motion Util Library
+# ---------------------------------------------------------
 add_library(motion_util_lib STATIC src/motion_util.cpp)
 ament_target_dependencies(motion_util_lib
   rclcpp
@@ -97,18 +83,17 @@ ament_target_dependencies(motion_util_lib
   geometry_msgs
   shape_msgs
 )
-
-# Set include directories for the library
 target_include_directories(motion_util_lib PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
-
-# Link the library to the pick executable
 target_link_libraries(pick_action_server motion_util_lib)
 target_link_libraries(place_action_server motion_util_lib)
 target_link_libraries(home_action_server motion_util_lib)
 
+# ---------------------------------------------------------
+# Interfaces (Messages/Services/Actions)
+# ---------------------------------------------------------
 rosidl_generate_interfaces(${PROJECT_NAME}
   "action/Pick.action"
   "action/Place.action"
@@ -118,109 +103,93 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   DEPENDENCIES geometry_msgs
 )
 
-add_dependencies(pick_action_server ${PROJECT_NAME})
-add_dependencies(pick_action_client ${PROJECT_NAME})
-add_dependencies(place_action_server ${PROJECT_NAME})
-add_dependencies(place_action_client ${PROJECT_NAME})
-add_dependencies(home_action_server ${PROJECT_NAME})
-add_dependencies(home_action_client ${PROJECT_NAME})
+# ---------------------------------------------------------
+# Link generated interfaces to all executables
+# ---------------------------------------------------------
+rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
-install(TARGETS
-  pick_action_server
-  pick_action_client
-  place_action_server
-  place_action_client
-  home_action_server
-  home_action_client
-  DESTINATION lib/${PROJECT_NAME}
-)
+# Helper macro to link dependencies and typesupport
+macro(configure_standard_node target_name)
+    add_dependencies(${target_name} ${PROJECT_NAME})
+    target_link_libraries(${target_name} ${cpp_typesupport_target})
+endmacro()
 
-install(DIRECTORY include/
-  DESTINATION include
-)
+configure_standard_node(pick_action_server)
+configure_standard_node(pick_action_client)
+configure_standard_node(place_action_server)
+configure_standard_node(place_action_client)
+configure_standard_node(home_action_server)
+configure_standard_node(home_action_client)
 
-
-
-if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  # the following line skips the linter which checks for copyrights
-  # comment the line when a copyright and license is added to all source files
-  set(ament_cmake_copyright_FOUND TRUE)
-  # the following line skips cpplint (only works in a git repo)
-  # comment the line when this package is in a git repo and when
-  # a copyright and license is added to all source files
-  set(ament_cmake_cpplint_FOUND TRUE)
-  ament_lint_auto_find_test_dependencies()
-endif()
-
-
+# ---------------------------------------------------------
+# Cube Detector (Existing)
+# ---------------------------------------------------------
 add_executable(cube_detector src/CubeDetector.cpp)
-ament_target_dependencies(
-  cube_detector
+ament_target_dependencies(cube_detector
   rclcpp
   geometry_msgs
   tf2
   tf2_ros
 )
+configure_standard_node(cube_detector)
 
-add_dependencies(cube_detector ${PROJECT_NAME})
-
-rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
-
-target_link_libraries(pick_action_server ${cpp_typesupport_target})
-target_link_libraries(pick_action_client ${cpp_typesupport_target})
-target_link_libraries(place_action_server ${cpp_typesupport_target})
-target_link_libraries(place_action_client ${cpp_typesupport_target})
-target_link_libraries(home_action_server ${cpp_typesupport_target})
-target_link_libraries(home_action_client ${cpp_typesupport_target})
-target_link_libraries(cube_detector ${cpp_typesupport_target})
-
-install(TARGETS 
-  cube_detector
-  DESTINATION lib/${PROJECT_NAME}
-)
-
-# Create orchestrator executable
+# ---------------------------------------------------------
+# Orchestrator (Existing)
+# ---------------------------------------------------------
 add_executable(orchestrator src/Orchestrator.cpp)
 ament_target_dependencies(orchestrator
   rclcpp
   rclcpp_action
   behaviortree_cpp
-  #behaviortree_ros2
   ament_index_cpp
 )
 target_include_directories(orchestrator PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
-target_link_libraries(orchestrator ${cpp_typesupport_target})
-add_dependencies(orchestrator ${PROJECT_NAME})
+configure_standard_node(orchestrator)
 
-install(TARGETS 
-  orchestrator
-  DESTINATION lib/${PROJECT_NAME}
-)
+# ---------------------------------------------------------
+# Color Detector (UPDATED)
+# ---------------------------------------------------------
 add_executable(color_detector src/ColorDetector.cpp)
-ament_target_dependencies(color_detector rclcpp cv_bridge sensor_msgs tf2 tf2_ros apriltag_msgs)
+ament_target_dependencies(color_detector 
+    rclcpp 
+    cv_bridge 
+    sensor_msgs 
+    tf2 
+    tf2_ros 
+    tf2_geometry_msgs  # <--- NEW: Needed for projection math
+    geometry_msgs      # <--- NEW: Needed for Poses
+    # apriltag_msgs    # REMOVED: No longer used here
+)
 target_link_libraries(color_detector ${OpenCV_LIBRARIES})
-add_dependencies(color_detector ${PROJECT_NAME})
-target_link_libraries(color_detector ${cpp_typesupport_target})
+configure_standard_node(color_detector)
 
+
+# ---------------------------------------------------------
+# Installation
+# ---------------------------------------------------------
 install(TARGETS
+  pick_action_server pick_action_client
+  place_action_server place_action_client
+  home_action_server home_action_client
+  cube_detector
+  orchestrator
   color_detector
   DESTINATION lib/${PROJECT_NAME}
 )
 
-install(DIRECTORY launch
-  DESTINATION share/${PROJECT_NAME}
-)
+install(DIRECTORY include/ DESTINATION include)
+install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY behaviour_trees DESTINATION share/${PROJECT_NAME})
 
-install(DIRECTORY config
-  DESTINATION share/${PROJECT_NAME}
-)
-
-install(DIRECTORY behaviour_trees
-  DESTINATION share/${PROJECT_NAME}
-)
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  set(ament_cmake_copyright_FOUND TRUE)
+  set(ament_cmake_cpplint_FOUND TRUE)
+  ament_lint_auto_find_test_dependencies()
+endif()
 
 ament_package()
