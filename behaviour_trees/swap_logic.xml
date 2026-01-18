@@ -2,19 +2,37 @@
 <root BTCPP_format="4">
   <BehaviorTree ID="MainTree">
     <Sequence>
-      <RetryUntilSuccessful num_attempts="{max_retries}">
+      
+        <!-- Detect colors at the start, store in blackboard -->
+        <DetectColorAction action_name="detect_color" color_result="{detected_colors}" />
+      
         <Sequence>
+          <RetryUntilSuccessful num_attempts="{max_retries}">
            <PickAction  action_name="pick" cube_id="1" />
+          </RetryUntilSuccessful>
+      
+          <RetryUntilSuccessful num_attempts="{max_retries}">
            <PlaceAction action_name="place" grabbed_cube_id="1" target_table_id="2" />
+          </RetryUntilSuccessful>
         </Sequence>
-      </RetryUntilSuccessful>
-
-      <RetryUntilSuccessful num_attempts="{max_retries}">
+      
         <Sequence>
+          <RetryUntilSuccessful num_attempts="{max_retries}">
            <PickAction  action_name="pick" cube_id="10" />
+          </RetryUntilSuccessful>
+      
+          <RetryUntilSuccessful num_attempts="{max_retries}">
            <PlaceAction action_name="place" grabbed_cube_id="10" target_table_id="1" />
+          </RetryUntilSuccessful>
         </Sequence>
-      </RetryUntilSuccessful>
+
+        <RetryUntilSuccessful num_attempts="{max_retries}">
+           <HomeAction action_name="home" />
+        </RetryUntilSuccessful>
+
+        <!-- Display the stored result at the end -->
+        <DisplayColorResult color_result="{detected_colors}" />
+        
     </Sequence>
   </BehaviorTree>
 </root>

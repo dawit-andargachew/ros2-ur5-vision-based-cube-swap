@@ -71,7 +71,36 @@ def generate_launch_description():
             )
         ],
     )
-	# 5. Orchestrator (delayed start to allow servers to initialize, screen output)
+
+	#5. Home action server (screen output for important logs)
+	home_action_server_node = Node(
+		package="group_6_assignment_2",
+		executable="home_action_server",
+		name="home_action_server",
+		output="screen",
+		parameters=[
+			{"use_sim_time": use_sim_time},
+			moveit_config.to_dict(),
+			PathJoinSubstitution(
+				[FindPackageShare("group_6_assignment_2"), "config", "robot_target_positions.yaml"]
+			)
+		],
+	)
+
+
+	# 6. Color detector service (screen output)
+	color_detector_node = Node(
+		package="group_6_assignment_2",
+		executable="color_detector",
+		name="color_detector",
+		output="screen",
+		parameters=[
+			{"use_sim_time": use_sim_time},
+		],
+	)
+
+
+	# 7. Orchestrator (delayed start to allow servers to initialize, screen output)
 	orchestrator_node = TimerAction(
 		period=5.0,  # Wait 5 seconds for all servers to start
 		actions=[
@@ -102,6 +131,8 @@ def generate_launch_description():
 			),
 			apriltag_launch,
 			cube_detector_node,
+			color_detector_node,
+			home_action_server_node,
 			pick_action_server_node,
 			place_action_server_node,
 			orchestrator_node,
