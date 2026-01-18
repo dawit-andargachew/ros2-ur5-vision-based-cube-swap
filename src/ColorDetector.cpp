@@ -1,9 +1,14 @@
 /**
  * Node: color_detector
- * * fixes included:
- * 1. OpenCV Assertion Crash (Deep Copy of CameraInfo)
- * 2. Service Deadlock (Reentrant Callback Group)
- * 3. Matching Logic (Increased Threshold + Debug Logs)
+ * * Type: Service Server & Client
+ *
+ *  * Purpose: 
+ * Determines the color of specific cubes by fusing 3D spatial data with 2D computer vision.
+ * Synchronizes with the 'cube_detector' service to retrieve verified cube poses.
+ * Projects 3D poses onto the image plane to match physical cubes with detected color blobs.
+ *
+ * * Output:
+ * Provides service "get_cube_colors" returning a mapped string of Cube IDs to Colors.
  */
 
 #include <rclcpp/rclcpp.hpp>
@@ -95,6 +100,7 @@ private:
     const std::vector<int32_t> TARGET_CUBE_IDS = {1, 10}; 
     static constexpr double MATCH_THRESHOLD = 500.0; // pixels - adjust based on your camera resolution
     static constexpr double MIN_DISTANCE_THRESHOLD = 10.0; // pixels - minimum to consider a match
+    
     // --- Callbacks for Data ---
     void image_callback(const sensor_msgs::msg::Image::SharedPtr msg) {
         std::lock_guard<std::mutex> lock(image_mutex_);
@@ -162,8 +168,7 @@ private:
         }
         return detections;
     }
-
-    // 
+    
     bool project_camera_pose_to_pixel(const geometry_msgs::msg::Pose& pose_in_cam_frame,
                                   const image_geometry::PinholeCameraModel& camera_model,
                                   cv::Point2d& output_pixel) 

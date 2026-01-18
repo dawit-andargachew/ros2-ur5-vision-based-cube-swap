@@ -9,12 +9,7 @@ This repository contains the code for **Assignment 2** of the *Intelligent Robot
 
 ---
 
-# **to be removed (Test color detection - 3 terminal)**
-```bash
-ros2 launch group_6_assignment_2 basic_a2_package.launch.py
-ros2 launch ir_launch assignment_2.launch.py
-ros2 service call /get_cube_colors group_6_assignment_2/srv/GetCubeColors {}
-```
+
 
 ## Overview
 
@@ -27,12 +22,6 @@ This package implements a complete pick-and-place system for swapping cubes betw
 
 ---
 
-## TODO
-
-- Integrate ColorDetector into the Orchestrator/BehaviorTree logic
-- Integrate go to Home after second place in BehvaiourTree logic
-
----
 
 ## Building
 

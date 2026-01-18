@@ -1,3 +1,18 @@
+/**
+ * Node: pick_action_client
+ * 
+ * type: action client node
+ * 
+ * purpose:
+ * Sends requests to the pick action server to pick up cubes.
+ * Communicates the cube ID to be picked and waits for action completion.
+ * Handles feedback and result messages from the pick action server.
+ * 
+ * 
+ * actions:
+ *  Sends goals to the "pick" action server with cube ID to trigger pick operations.
+ */
+
 #include <chrono>
 #include <memory>
 #include <string>

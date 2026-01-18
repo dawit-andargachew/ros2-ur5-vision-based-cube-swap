@@ -5,7 +5,6 @@
         size: 0.05              # USER CHANGED BASED ON SPEC "THE APRILTAG SIZE IS: 0.050x0.050 [m]" tag edge size in meter
         max_hamming: 0          # maximum allowed hamming distance (corrected bits)
 
-        # see "apriltag.h" 'struct apriltag_detector' for more documentation on these optional parameters
         detector:
             threads: 4          # number of threads
             decimate: 2.0       # decimate resolution for quad detection

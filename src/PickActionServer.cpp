@@ -1,3 +1,19 @@
+/**
+ * Node: pick_action_server
+ * 
+ * type: action server node
+ * 
+ * purpose:
+ * Handles pick action requests for picking up cubes in the environment.
+ * Queries cube positions using the cube detector service.
+ * Plans and executes pick trajectories using MoveIt.
+ * Manages gripper control and collision objects during pick operations.
+ * 
+ * 
+ * actions:
+ *  Provides an action server "pick" that picks up cubes by their ID.
+ */
+
 #include <chrono>
 #include <map>
 #include <memory>
@@ -104,12 +120,6 @@ public:
     if (!sense_cube(cube_id)) return false;
     if (goal_handle->is_canceling()) return false;
 
-    // // Move to home position (safe position before cleanup)
-    // feedback->status = "Moving to home position";
-    // goal_handle->publish_feedback(feedback);
-    // if (!motion_util::move_to_joint_configuration(home_joint_config_, arm_group_, "home", get_logger())) return false;
-    // if (goal_handle->is_canceling()) return false;
-
     // Clean up scene state from any previous attempts (at home position, safe to detach)
     feedback->status = "Cleaning up scene state";
     goal_handle->publish_feedback(feedback);
@@ -176,10 +186,8 @@ private:
 
   rclcpp_action::Server<Pick>::SharedPtr action_server_;
   rclcpp::Client<group_6_assignment_2::srv::GetCubePoses>::SharedPtr cube_pose_client_;
-  
-  // =========================
+ 
   // Members (own the state)
-  // =========================
   moveit::planning_interface::MoveGroupInterface arm_group_;
   moveit::planning_interface::MoveGroupInterface gripper_group_;
   moveit::planning_interface::PlanningSceneInterface planning_scene_;
@@ -231,15 +239,11 @@ private:
     double grasp_orientation_yaw = 0.0;
 
     // Grasp position offsets from cube center (meters)
-    // For side grasp: x=0, y=tool_length(~0.18), z=slight_offset(~0.15)
-    // For top grasp:  x=0, y=0, z=tool_length(~0.18)
     double grasp_offset_x = 0.0;
     double grasp_offset_y = 0.18;
     double grasp_offset_z = 0.15;
 
     // Pre-grasp approach offsets from grasp pose (meters)
-    // For side grasp: approach from above (z=0.20), then descend
-    // For top grasp:  approach from above (z=0.20), then descend
     double pregrasp_offset_x = 0.0;
     double pregrasp_offset_y = 0.0;
     double pregrasp_offset_z = 0.20;
@@ -659,8 +663,7 @@ private:
     return plan_and_execute_to_pose(lift_pose, arm_group_, get_logger());
   }
 };
-} // namespace pick_action_cpp
-// Updated main
+}
 int main(int argc, char* argv[])
 {
   rclcpp::init(argc, argv);

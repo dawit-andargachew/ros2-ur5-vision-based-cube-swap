@@ -1,3 +1,18 @@
+/**
+ * Node: home_action_client
+ * 
+ * type: action client node
+ * 
+ * purpose:
+ * Sends requests to the home action server to move the robotic arm to home position.
+ * Waits for the home action server and sends a goal request.
+ * Handles feedback and result messages from the action server.
+ * 
+ * 
+ * actions:
+ *  Sends goals to the "home" action server to trigger home position movement.
+ */
+
 #include <memory>
 
 #include <rclcpp/rclcpp.hpp>
